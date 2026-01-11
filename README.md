@@ -1,3 +1,7 @@
+This is my solutions fork of teorth's Analysis I Lean formalization. I originally was working on this separately using Shaunticlair/tao-analysis-lean-practice, but I finally decided it was more trouble than it's worth to keep building up my own repo.
+
+------
+
 # Lean formalization of _Analysis I_
 
 The files in this directory contain a formalization of my text [_Analysis I_](https://terrytao.wordpress.com/books/analysis-i/) into [Lean](https://lean-lang.org/). The formalization is intended to be as faithful a paraphrasing as possible to the original text, while also showcasing Lean's features and syntax.  In particular, the formalization is _not_ optimized for efficiency, and in some cases may deviate from idiomatic Lean usage.
