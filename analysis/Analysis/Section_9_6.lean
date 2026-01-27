@@ -47,7 +47,7 @@ example : ¬ BddOn (fun x:ℝ ↦ 1/x) (.Ioo 0 1) := by sorry
 
 theorem why_7_6_3 {n: ℕ → ℕ} (hn: StrictMono n) (j:ℕ) : n j ≥ j := by sorry
 
-/-- Lemma 7.6.3 -/
+/-- Lemma 9.6.3 -/
 theorem BddOn.of_continuous_on_compact {a b:ℝ} (h:a < b) {f:ℝ → ℝ} (hf: ContinuousOn f (.Icc a b) ) :
   BddOn f (.Icc a b) := by
   -- This proof is written to follow the structure of the original text.

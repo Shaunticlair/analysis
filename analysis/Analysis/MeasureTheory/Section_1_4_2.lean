@@ -19,6 +19,8 @@ def MeasurableSpace.toConcreteSigmaAlgebra {X: Type*} (M: MeasurableSpace X) : C
 
 def ConcreteBooleanAlgebra.isSigmaAlgebra {X: Type*} (B: ConcreteBooleanAlgebra X) : Prop := ∀ E : ℕ → Set X, (∀ n, measurable (E n)) → measurable (⋃ n, E n)
 
+theorem ConcreteSigmaAlgebra.isSigmaAlgebra {X: Type*} (B: ConcreteSigmaAlgebra X) : B.isSigmaAlgebra := by sorry
+
 def ConcreteBooleanAlgebra.isSigmaAlgebra.toSigmaAlgebra {X: Type*} {B: ConcreteBooleanAlgebra X} (h: B.isSigmaAlgebra) : ConcreteSigmaAlgebra X :=
   { countable_union_mem := h }
 
@@ -207,3 +209,20 @@ example (d₁ d₂ :ℕ) (E : Set (EuclideanSpace' (d₁+d₂)))
 theorem LebesgueMeasurable.sigmaAlgebra_generated_by {d:ℕ} :
   LebesgueMeasurable.sigmaAlgebra d = ConcreteSigmaAlgebra.generated_by ( (BorelSigmaAlgebra (EuclideanSpace' d)).measurableSets ∪ (IsNull.sigmaAlgebra d).measurableSets) :=
   by sorry
+
+def ConcreteSigmaAlgebra.measurableSpace {X: Type*} (B: ConcreteSigmaAlgebra X) : MeasurableSpace X := {
+  MeasurableSet' := B.measurable
+  measurableSet_empty := B.empty_mem
+  measurableSet_compl := B.compl_mem
+  measurableSet_iUnion := B.countable_union_mem
+}
+
+def MeasurableSpace.sigmaAlgebra {X: Type*} (M: MeasurableSpace X) : ConcreteSigmaAlgebra X := {
+  measurable := M.MeasurableSet'
+  empty_mem := M.measurableSet_empty
+  compl_mem := M.measurableSet_compl
+  union_mem := sorry
+  countable_union_mem := M.measurableSet_iUnion
+}
+
+theorem BorelSigmaAlgebra.le_LebesgueSigmaAlgebra (d:ℕ) : BorelSigmaAlgebra (EuclideanSpace' d) ≤ LebesgueMeasurable.sigmaAlgebra d := by sorry
