@@ -60,17 +60,25 @@ theorem Nat.two_mul (m: Nat) : 2 * m = 0 + m + m := by
 /-- This lemma will be useful to prove Lemma 2.3.2.
 Compare with Mathlib's `Nat.mul_zero` -/
 lemma Nat.mul_zero (n: Nat) : n * 0 = 0 := by
-  sorry
+  revert n; apply induction
+  · rw [zero_mul]
+  intro n ih; rw [succ_mul, ih, add_zero]
 
 /-- This lemma will be useful to prove Lemma 2.3.2.
 Compare with Mathlib's `Nat.mul_succ` -/
 lemma Nat.mul_succ (n m:Nat) : n * m++ = n * m + n := by
-  sorry
+  revert n; apply induction
+  · rw [zero_mul, zero_mul, zero_add]
+  intro n ih; rw [succ_mul, ih, succ_mul]
+  rw [add_succ, add_succ]
+  rw [add_assoc, add_assoc, add_comm n m]
 
 /-- Lemma 2.3.2 (Multiplication is commutative) / Exercise 2.3.1
 Compare with Mathlib's `Nat.mul_comm` -/
 lemma Nat.mul_comm (n m: Nat) : n * m = m * n := by
-  sorry
+  revert n; apply induction
+  · rw [zero_mul, mul_zero]
+  intro n ih; rw [succ_mul, mul_succ, ih]
 
 /-- Compare with Mathlib's `Nat.mul_one` -/
 theorem Nat.mul_one (m: Nat) : m * 1 = m := by
@@ -79,12 +87,18 @@ theorem Nat.mul_one (m: Nat) : m * 1 = m := by
 /-- This lemma will be useful to prove Lemma 2.3.3.
 Compare with Mathlib's `Nat.mul_pos` -/
 lemma Nat.pos_mul_pos {n m: Nat} (h₁: n.IsPos) (h₂: m.IsPos) : (n * m).IsPos := by
-  sorry
+  apply uniq_succ_eq at h₁; apply uniq_succ_eq at h₂
+  obtain ⟨a, rfl, h2⟩ := h₁
+  obtain ⟨b, rfl, h4⟩ := h₂
+  rw [succ_mul, add_succ]
+  apply succ_ne
 
 /-- Lemma 2.3.3 (Positive natural numbers have no zero divisors) / Exercise 2.3.2.
     Compare with Mathlib's `Nat.mul_eq_zero`.  -/
 lemma Nat.mul_eq_zero (n m: Nat) : n * m = 0 ↔ n = 0 ∨ m = 0 := by
-  sorry
+  constructor <;> intro h
+  · contrapose! h; apply pos_mul_pos; apply h.1; apply h.2
+  rcases h with (rfl | rfl); rw [zero_mul]; rw [mul_zero]
 
 /-- Proposition 2.3.4 (Distributive law)
 Compare with Mathlib's `Nat.mul_add` -/
@@ -105,7 +119,10 @@ theorem Nat.add_mul (a b c: Nat) : (a + b)*c = a*c + b*c := by
 /-- Proposition 2.3.5 (Multiplication is associative) / Exercise 2.3.3
 Compare with Mathlib's `Nat.mul_assoc` -/
 theorem Nat.mul_assoc (a b c: Nat) : (a * b) * c = a * (b * c) := by
-  sorry
+  revert c; apply induction
+  · repeat rw [mul_zero]
+  intro c ih
+  rw [mul_succ, mul_succ, mul_add, ih]
 
 /-- (Not from textbook)  Nat is a commutative semiring.
     This allows tactics such as `ring` to apply to the Chapter 2 natural numbers. -/
@@ -127,14 +144,9 @@ example (a b c d:ℕ) : (a+b)*1*(c+d) = d*b+a*c+c*b+a*d+0 := by ring
 /-- Proposition 2.3.6 (Multiplication preserves order)
 Compare with Mathlib's `Nat.mul_lt_mul_of_pos_right` -/
 theorem Nat.mul_lt_mul_of_pos_right {a b c: Nat} (h: a < b) (hc: c.IsPos) : a * c < b * c := by
-  -- This proof is written to follow the structure of the original text.
-  rw [lt_iff_add_pos] at h
-  choose d hdpos hd using h
-  replace hd := congr($hd * c)
-  rw [add_mul] at hd
-  have hdcpos : (d * c).IsPos := pos_mul_pos hdpos hc
-  rw [lt_iff_add_pos]
-  use d*c
+  rw [lt_iff_add_pos] at *
+  obtain ⟨d, hd, rfl⟩ := h
+  refine ⟨d * c, pos_mul_pos hd hc, by ring⟩
 
 /-- Proposition 2.3.6 (Multiplication preserves order) -/
 theorem Nat.mul_gt_mul_of_pos_right {a b c: Nat} (h: a > b) (hc: c.IsPos) :
@@ -154,35 +166,52 @@ theorem Nat.mul_gt_mul_of_pos_left {a b c: Nat} (h: a > b) (hc: c.IsPos) :
 Compare with Mathlib's `Nat.mul_right_cancel` -/
 lemma Nat.mul_cancel_right {a b c: Nat} (h: a * c = b * c) (hc: c.IsPos) : a = b := by
   -- This proof is written to follow the structure of the original text.
-  have := trichotomous a b
-  obtain hlt | rfl | hgt := this
-  . replace hlt := mul_lt_mul_of_pos_right hlt hc
+  rcases trichotomous a b with hlt | rfl | hgt
+  · replace hlt := mul_lt_mul_of_pos_right hlt hc
     apply ne_of_lt at hlt
     contradiction
-  . rfl
-  replace hgt := mul_gt_mul_of_pos_right hgt hc
-  apply ne_of_gt at hgt
-  contradiction
+  · rfl
+  · replace hgt := mul_gt_mul_of_pos_right hgt hc
+    apply ne_of_gt at hgt
+    contradiction
 
+/-
+∀ (a b c : Nat), a ≤ b → 0 ≤ c → c * a ≤ c * b
+-/
+lemma Nat.mul_le_mul_of_nonneg_left' (a b c : Nat) (hab : a ≤ b) (_ : 0 ≤ c) : c * a ≤ c * b := by
+  obtain ⟨d, rfl⟩ := hab; exact ⟨c*d, by ring⟩
 /-- (Not from textbook) Nat is an ordered semiring.
 This allows tactics such as `gcongr` to apply to the Chapter 2 natural numbers. -/
 instance Nat.isOrderedRing : IsOrderedRing Nat where
-  zero_le_one := by sorry
-  mul_le_mul_of_nonneg_left := by sorry
-  mul_le_mul_of_nonneg_right := by sorry
+  zero_le_one := ⟨1, by ring⟩
+  mul_le_mul_of_nonneg_left := mul_le_mul_of_nonneg_left'
+  mul_le_mul_of_nonneg_right := by
+    intros; rw [mul_comm]; nth_rw 2 [mul_comm]
+    apply mul_le_mul_of_nonneg_left'; repeat assumption
 
 /-- This illustration of the `gcongr` tactic is not from the
     textbook. -/
 example (a b c d:Nat) (hab: a ≤ b) : c*a*d ≤ c*b*d := by
-  gcongr
-  . exact d.zero_le
-  exact c.zero_le
+  gcongr <;> apply Nat.zero_le
+
+
+lemma Nat.isPos_iff_gt_zero {n: Nat} : n.IsPos ↔ n > 0 := by
+  rw [gt_iff, isPos_iff]; simp
 
 /-- Proposition 2.3.9 (Euclid's division lemma) / Exercise 2.3.5
 Compare with Mathlib's `Nat.mod_eq_iff` -/
 theorem Nat.exists_div_mod (n:Nat) {q: Nat} (hq: q.IsPos) :
     ∃ m r: Nat, 0 ≤ r ∧ r < q ∧ n = m * q + r := by
-  sorry
+  revert n; apply induction
+  · refine ⟨0,0, by simp; apply isPos_iff_gt_zero.mp hq⟩
+  intro n ih
+  obtain ⟨m, r, hr, hrq, hih⟩ := ih
+  by_cases hrpq : r++ ≠ q <;> subst hih
+  · refine ⟨m, r++, zero_le _, ?_, by rw [add_succ]⟩
+    rw [Nat.lt_iff_succ_le] at hrq; order
+  · refine ⟨m++, 0, zero_le _, isPos_iff_gt_zero.mp hq, ?_, ⟩
+    push_neg at hrpq; subst hrpq
+    rw [← add_succ, ← succ_mul, add_zero]
 
 /-- Definition 2.3.11 (Exponentiation for natural numbers) -/
 abbrev Nat.pow (m n: Nat) : Nat := Nat.recurse (fun _ prod ↦ prod * m) 1 n
@@ -209,9 +238,12 @@ theorem Nat.pow_succ (m n: Nat) : (m:Nat) ^ n++ = m^n * m :=
 theorem Nat.pow_one (m: Nat) : m ^ (1:Nat) = m := by
   rw [←zero_succ, pow_succ]; simp
 
+theorem Nat.pow_two (m: Nat) : m ^ (2:Nat) = m * m := by
+  rw [←one_succ, pow_succ, pow_one]
+
 /-- Exercise 2.3.4-/
 theorem Nat.sq_add_eq (a b: Nat) :
     (a + b) ^ (2 : Nat) = a ^ (2 : Nat) + 2 * a * b + b ^ (2 : Nat) := by
-  sorry
+  rw [pow_two]; ring; rfl
 
 end Chapter2

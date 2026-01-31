@@ -42,7 +42,7 @@ theorem Russells_paradox : ¬ axiom_of_universal_specification := by
   set P : Object → Prop := fun x ↦ ∃ X:Set, x = X ∧ x ∉ X
   choose Ω hΩ using h P
   by_cases h: (Ω:Object) ∈ Ω
-  . have : P (Ω:Object) := (hΩ _).mp h
+  · have : P (Ω:Object) := (hΩ _).mp h
     obtain ⟨ Ω', ⟨ hΩ1, hΩ2⟩ ⟩ := this
     simp at hΩ1
     rw [←hΩ1] at hΩ2
@@ -67,7 +67,8 @@ theorem SetTheory.Set.axiom_of_regularity {A:Set} (h: A ≠ ∅) :
 -/
 theorem SetTheory.Set.emptyset_exists (h: axiom_of_universal_specification):
     ∃ (X:Set), ∀ x, x ∉ X := by
-  sorry
+  choose X hX using h (fun _ => False)
+  simp at hX; use X
 
 /--
   Exercise 3.2.1.  The spirit of the exercise is to establish these results without using either
@@ -75,7 +76,8 @@ theorem SetTheory.Set.emptyset_exists (h: axiom_of_universal_specification):
 -/
 theorem SetTheory.Set.singleton_exists (h: axiom_of_universal_specification) (x:Object):
     ∃ (X:Set), ∀ y, y ∈ X ↔ y = x := by
-  sorry
+  choose X hX using h (fun y => y = x)
+  use X
 
 /--
   Exercise 3.2.1.  The spirit of the exercise is to establish these results without using either
@@ -83,7 +85,8 @@ theorem SetTheory.Set.singleton_exists (h: axiom_of_universal_specification) (x:
 -/
 theorem SetTheory.Set.pair_exists (h: axiom_of_universal_specification) (x₁ x₂:Object):
     ∃ (X:Set), ∀ y, y ∈ X ↔ y = x₁ ∨ y = x₂ := by
-  sorry
+  choose X hX using h (fun y => y = x₁ ∨ y = x₂)
+  use X
 
 /--
   Exercise 3.2.1. The spirit of the exercise is to establish these results without using either
@@ -91,7 +94,8 @@ theorem SetTheory.Set.pair_exists (h: axiom_of_universal_specification) (x₁ x�
 -/
 theorem SetTheory.Set.union_exists (h: axiom_of_universal_specification) (A B:Set):
     ∃ (Z:Set), ∀ z, z ∈ Z ↔ z ∈ A ∨ z ∈ B := by
-  sorry
+  choose Z hZ using h (fun z => z ∈ A ∨ z ∈ B)
+  use Z
 
 /--
   Exercise 3.2.1. The spirit of the exercise is to establish these results without using either
@@ -99,7 +103,8 @@ theorem SetTheory.Set.union_exists (h: axiom_of_universal_specification) (A B:Se
 -/
 theorem SetTheory.Set.specify_exists (h: axiom_of_universal_specification) (A:Set) (P: A → Prop):
     ∃ (Z:Set), ∀ z, z ∈ Z ↔ ∃ h : z ∈ A, P ⟨ z, h ⟩ := by
-  sorry
+  choose Z hZ using h (fun z => ∃ h : z ∈ A, P ⟨ z, h ⟩)
+  use Z
 
 /--
   Exercise 3.2.1. The spirit of the exercise is to establish these results without using either
@@ -108,20 +113,50 @@ theorem SetTheory.Set.specify_exists (h: axiom_of_universal_specification) (A:Se
 theorem SetTheory.Set.replace_exists (h: axiom_of_universal_specification) (A:Set)
   (P: A → Object → Prop) (hP: ∀ x y y', P x y ∧ P x y' → y = y') :
     ∃ (Z:Set), ∀ y, y ∈ Z ↔ ∃ a : A, P a y := by
-  sorry
+  choose Z hZ using h (fun y => ∃ a : A, P a y)
+  use Z
 
 /-- Exercise 3.2.2 -/
-theorem SetTheory.Set.not_mem_self (A:Set) : (A:Object) ∉ A := by sorry
+theorem SetTheory.Set.not_mem_self (A:Set) : (A:Object) ∉ A := by
+  intro h;
+  have := axiom_of_regularity (A:= ({(A:Object)}:Set) )
+    (by apply nonempty_of_inhabited; aesop)
+  contrapose! this
+  intro x; use A
+  simp [(mem_singleton _ _).mp x.property ]
+  rw [disjoint_iff]; push_neg;
+  apply nonempty_of_inhabited (x := set_to_object A)
+  simp_all
 
 /-- Exercise 3.2.2 -/
-theorem SetTheory.Set.not_mem_mem (A B:Set) : (A:Object) ∉ B ∨ (B:Object) ∉ A := by sorry
+theorem SetTheory.Set.not_mem_mem (A B:Set) : (A:Object) ∉ B ∨ (B:Object) ∉ A := by
+  have h := axiom_of_regularity (A:= {(A:Object),(B:Object)})
+    (by apply nonempty_of_inhabited; aesop)
+  contrapose! h; intro x;
+  rcases (mem_pair _ _ _).mp x.property with h1 | h2
+  · use A; simp [h1]
+    rw [disjoint_iff]; push_neg
+    apply nonempty_of_inhabited (x := set_to_object B)
+    simp [h]
+  · use B; simp [h2]
+    rw [disjoint_iff]; push_neg
+    apply nonempty_of_inhabited (x := set_to_object A)
+    simp [h]
 
+#check axiom_of_universal_specification
 /-- Exercise 3.2.3 -/
 theorem SetTheory.Set.univ_iff : axiom_of_universal_specification ↔
-  ∃ (U:Set), ∀ x, x ∈ U := by sorry
+  ∃ (U:Set), ∀ x, x ∈ U := by
+  constructor <;> intro h
+  · choose U hU using h (fun _ => True)
+    use U; simp_all
+  · choose U hU using h
+    intro P; use specify U (fun x => P x); intro x
+    rw [specification_axiom'']; aesop
 
 /-- Exercise 3.2.3 -/
-theorem SetTheory.Set.no_univ : ¬ ∃ (U:Set), ∀ (x:Object), x ∈ U := by sorry
+theorem SetTheory.Set.no_univ : ¬ ∃ (U:Set), ∀ (x:Object), x ∈ U := by
+  rw [← univ_iff]; exact Russells_paradox
 
 
 end Chapter3

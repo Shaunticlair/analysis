@@ -4,7 +4,7 @@ import Analysis.Tools.ExistsUnique
 
 /-!
 # Analysis I, Section 3.3: Functions
-
+s
 I have attempted to make the translation as faithful a paraphrasing as possible of the original
 text. When there is a choice between a more idiomatic Lean solution and a more faithful
 translation, I have generally chosen the latter. In particular, there will be places where the
@@ -63,9 +63,11 @@ structure Function (X Y: Set) where
 noncomputable def Function.to_fn {X Y: Set} (f: Function X Y) : X → Y :=
   fun x ↦ (f.unique x).choose
 
+-- Tao `Function` → Mathlib function
 noncomputable instance Function.inst_coefn (X Y: Set) : CoeFun (Function X Y) (fun _ ↦ X → Y) where
   coe := Function.to_fn
 
+-- CoeFun Also allows us to use f x notation
 theorem Function.to_fn_eval {X Y: Set} (f: Function X Y) (x:X) : f.to_fn x = f x := rfl
 
 /-- Converting a Mathlib function to a Chapter 3 `Function` -/
@@ -74,11 +76,22 @@ abbrev Function.mk_fn {X Y: Set} (f: X → Y) : Function X Y :=
 
 /-- Definition 3.3.1 -/
 theorem Function.eval {X Y: Set} (f: Function X Y) (x: X) (y: Y) : y = f x ↔ f.P x y := by
+  -- y = f x uses coeFun, which defines f x to be (f.unique x).choose
+  -- Thus, our theorem is
+  show y = (f.unique x).choose ↔ f.P x y
+  -- Choose_iff says that, if a property is unique, then any element satisfying it is the chosen one. So it matches.
   convert ((f.unique x).choose_iff y).symm
+  -- This deals with the concern that .choose might not consistenty
+  -- give the same, desired element: by uniqueness, it does
 
+-- Allows us to auto-evaluate functions defined using `Function.mk_fn`
 @[simp]
 theorem Function.eval_of {X Y: Set} (f: X → Y) (x:X) : (Function.mk_fn f) x = f x := by
-  symm; rw [eval]
+  -- We're creating the function g := (Function.mk_fn f)
+  -- So g.P := (y = f x)
+  symm
+  --  f x = g x ↔ g.P x (f x) ↔ f x = f x
+  rw [eval]
 
 
 /-- Example 3.3.3.   -/
@@ -121,12 +134,13 @@ theorem SetTheory.Set.P_3_3_3c_existsUnique (x: (Nat \ {(0:Object)}: Set)) :
   -- Some technical unpacking here due to the subtle distinctions between the `Object` type,
   -- sets converted to subtypes of `Object`, and subsets of those sets.
   obtain ⟨ x, hx ⟩ := x; simp at hx; obtain ⟨ hx1, hx2 ⟩ := hx
+  -- Pass info from Object world to ℕ world (passing thru Nat since not all objects are ℕ )
   set n := ((⟨ x, hx1 ⟩:Nat):ℕ)
   have : x = (n:Nat) := by simp [n]
   simp [P_3_3_3c, this, Object.ofnat_eq'] at hx2 ⊢
-  replace hx2 : n = (n-1) + 1 := by omega
+  -- Since n is nonzero, n-1 is allowed. The rest is algebra.
   apply ExistsUnique.intro ((n-1:ℕ):Nat)
-  . simp [←hx2]
+  · simp; omega
   intro y hy; simp [←hy]
 
 abbrev SetTheory.Set.f_3_3_3c : Function (Nat \ {(0:Object)}: Set) Nat :=
@@ -166,10 +180,10 @@ example : ¬ ∃ f: ℝ → ℝ, ∀ x y, y = f x ↔ y^2 = x := by
 
 example : ¬ ∃ f: NNReal → ℝ, ∀ x y, y = f x ↔ y^2 = x := by
   by_contra h
-  obtain ⟨f, hf⟩ := h; specialize hf 4; set y := f 4
-  have hy := (hf y).mp (by rfl)
-  have h1 : 2 = y := (hf 2).mpr (by norm_num)
-  have h2 : -2 = y := (hf (-2)).mpr (by norm_num)
+  obtain ⟨f, hf⟩ := h; specialize hf 4; set z := f 4
+  have hy := (hf z).mp (by rfl)
+  have h1 : 2 = z := (hf 2).mpr (by norm_num)
+  have h2 : -2 = z := (hf (-2)).mpr (by norm_num)
   linarith
 
 example : ∃ f: NNReal → NNReal, ∀ x y, y = f x ↔ y^2 = x := by

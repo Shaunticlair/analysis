@@ -41,13 +41,14 @@ inductive Nat where
 | succ : Nat → Nat
 deriving Repr, DecidableEq  -- this allows `decide` to work on `Nat`
 
+
 /-- Axiom 2.1 (0 is a natural number) -/
 instance Nat.instZero : Zero Nat := ⟨ zero ⟩
 #check (0:Nat)
 
 /-- Axiom 2.2 (Successor of a natural number is a natural number) -/
 postfix:100 "++" => Nat.succ
-#check (fun n ↦ n++)
+#check (fun n ↦ n++) -- Checking the type to show we output a natural
 
 
 /--
