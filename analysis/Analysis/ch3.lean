@@ -2177,7 +2177,7 @@ theorem Function.comp_eq_comp {X Y Z: Set} (g: Function Y Z) (f: Function X Y) :
     (g ○ f).to_fn = g.to_fn ∘ f.to_fn :=
 by
   ext; simp only [Function.comp_eval,
-                  Function.comp_apply] -- Not sure where this comes from
+                  Function.comp_apply] -- Mathlib machinery
 
 /-
 Lemma 3.3.12 (Composition is associative). Let f: X-+ Y, g:
@@ -2379,7 +2379,6 @@ theorem Function.comp_cancel_right {X Y Z:Set} {f: Function X Y} {g g': Function
   repeat rw [Function.comp_eval] at heq
   exact heq
 
--- the first line of this construction should be either `apply isTrue` or `apply isFalse`.
 
 
 
@@ -3766,6 +3765,19 @@ def OrderedPair.toObject : OrderedPair ↪ Object where
                 · exact hdb.symm -- d = b
               · exact hbd -- b = d
 
+-- Huh. Neat logic thing: ((a → c) or (b → c)) ⇔  ((a and b) → c)
+-- Also, ((a → c) and (b → c)) ⇔ ((a or b) → c)
+
+example : ((a → c) ∨ (b → c)) ↔ ((a ∧ b) → c) := by
+simp_all only [and_imp]
+apply Iff.intro
+· intro a_1 a_2 a_3
+  simp_all only [forall_const, or_self]
+· intro a_1
+
+  tauto
+
+example : ((a → c) ∧ (b → c)) ↔ ((a ∨ b) → c) := by tauto
 
 -- Coercion
 instance OrderedPair.inst_coeObject : Coe OrderedPair Object where

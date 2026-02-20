@@ -285,32 +285,34 @@ theorem SetTheory.Set.tuple_mem_iProd {I: Set} {X: I → Set} (x: ∀ i, X i) :
 
 lemma SetTheory.Set.constr_object {A : Set} {x : Object} {h : x ∈ A}: (⟨x,h⟩:A) = x := by simp
 
-/-- Each tuple in iProd X corresponds to one mapping function -/
-noncomputable abbrev SetTheory.Set.iProd_fun_equiv (I:Set) (X: I → Set) :iProd X ≃ (∀ i, X i) where
-  toFun z := (mem_iProd' z.prop).choose
-  invFun f := ⟨tuple f, tuple_mem_iProd _⟩
-  left_inv z  := by
-    ext; generalize_proofs h1 h2 at *
-    conv => lhs; simp
-    symm; exact (h2 z).choose_spec
-  right_inv f := by
-    ext; simp; generalize_proofs h1 h2 h3
-    congr; apply congrFun
-    rw [← tuple_inj]
-    symm; exact h1.choose_spec
+-- Allow coercions between functions and iProd X
+-- These coercions are bijective, as iProd_of_const_equiv shows
 
 noncomputable instance SetTheory.Set.iProd.inst_coefn {I:Set} {X: I → Set} : CoeFun (iProd X) (fun _ ↦ ∀ i, X i) where
-  coe := (iProd_fun_equiv I X)
+  coe z := (mem_iProd' z.prop).choose
 
-noncomputable instance SetTheory.Set.iProd.inst_coe_fn_to_iProd {I:Set} {X: I → Set}: Coe (∀ i, X i) (iProd X) where
-  coe := (iProd_fun_equiv I X).symm
+instance SetTheory.Set.iProd.inst_coe_fn_to_iProd {I:Set} {X: I → Set}: Coe (∀ i, X i) (iProd X) where
+  coe x := ⟨tuple x, tuple_mem_iProd _⟩
 
+lemma SetTheory.Set.iProd_tuple_iProd_rfl {I:Set} {X: I → Set} (t : iProd X) (h : tuple t ∈ iProd X): (⟨tuple t, h⟩: iProd X) = t := by
+  generalize_proofs h1 at *
+  ext; conv => lhs; simp
+  symm; exact h1.choose_spec
+
+lemma SetTheory.Set.fun_tuple_iProd_fun_rfl {I:Set} {X: I → Set} (x: ∀ i, X i) (h : tuple x ∈ iProd X):
+((⟨tuple x, h⟩: iProd X):∀ i, X i) = x := by
+  generalize_proofs h1
+  have := h1.choose_spec; -- The function for iProd is a tuple
+  conv at this => lhs; rw [constr_object] -- Two equal tuples
+  rw [tuple_inj] at this; symm; exact this -- Thus, same function
 
 /-- Example 3.5.10 -/
-noncomputable abbrev SetTheory.Set.iProd_of_const_equiv (I:Set) (X: Set) : iProd (fun _:I ↦ X) ≃ (I → X) :=
-  iProd_fun_equiv I (fun _ ↦ X)
-
-
+noncomputable abbrev SetTheory.Set.iProd_of_const_equiv (I:Set) (X: Set) :
+    iProd (fun _:I ↦ X) ≃ (I → X) where
+  toFun x := x
+  invFun f := f
+  left_inv x  := iProd_tuple_iProd_rfl   x (tuple_mem_iProd _)
+  right_inv f := fun_tuple_iProd_fun_rfl f (tuple_mem_iProd _)
 
 /--
   Example 3.5.10. I suspect most of the equivalences will require classical reasoning and only be
@@ -319,139 +321,46 @@ noncomputable abbrev SetTheory.Set.iProd_of_const_equiv (I:Set) (X: Set) : iProd
 noncomputable abbrev SetTheory.Set.singleton_iProd_equiv (i:Object) (X:Set) :
     iProd (fun _:({i}:Set) ↦ X) ≃ X where
   toFun t := t ⟨i, by aesop⟩
-  invFun x := (fun _:({i}:Set) ↦ x)
-  left_inv t := by -- with one input, func t is eq to const func (t i)
-    simp only; rw [Equiv.symm_apply_eq];
-    ext ⟨j, hj⟩; simp at hj; subst hj; congr
-  right_inv x := by -- Cast f(x)=x func → iProd → func, cancels out
-    simp only [Equiv.apply_symm_apply] -- We just get f(i)=x
+  invFun x := (fun _:({i}:Set) ↦ x) -- Cast to tuple, then iProd
+  left_inv t := by
+    simp only; generalize_proofs h1 h2 h3
+    ext; simp -- We want to check if the tuples are equal
+    conv => rhs; rw [h1.choose_spec]
+    rw [tuple_inj]; ext ⟨j, hj⟩ -- They're equal if the funcs are equal
+    simp at hj; simp [hj]
+  right_inv x := by -- const func → tup → iProd → func, apply i to func
+    generalize_proofs h1 h2 h3
+    simp; rw [fun_tuple_iProd_fun_rfl] -- Cancel out f → t → i → f loop
+    apply h3
+
 
 /-- Example 3.5.10 -/
 abbrev SetTheory.Set.empty_iProd_equiv (X: (∅:Set) → Set) : iProd X ≃ Unit where
   toFun _ := ()
   invFun _ := ⟨tuple (absurd ·.prop (by simp)), tuple_mem_iProd _⟩
-  left_inv x  := by ext; rw [(mem_iProd' x.prop).choose_spec]
+  left_inv x  := by ext; simp;
+                    rw [(mem_iProd' x.prop).choose_spec]
                     rw [tuple_inj]; ext i;
                     absurd i.prop; simp
   right_inv x := by simp
 
-noncomputable abbrev SetTheory.Set.empty_iProd_equiv' (X: (∅:Set) → Set) : iProd X ≃ Unit where
-  toFun _ := ()
-  invFun _ := (absurd ·.prop (by simp) : ∀ i, X i)
-  left_inv x  := by
-    simp only [Equiv.symm_apply_eq]
-    ext i; absurd i.prop; simp
-  right_inv x := by simp
 
--- These instances allow me to use 0 and 1 in {0,1} without explicitly, tediously having to clarify their presence.
-
---instance set01_0_inst: OfNat ({0,1} : Set) 0 where
---  ofNat := ⟨0, by aesop⟩
-
---instance set01_1_inst: OfNat ({0,1} : Set) 1 where
---  ofNat := ⟨1, by aesop⟩
-/-
-noncomputable instance (i: ({0,1}:Set)): Decidable (i = ⟨0, by aesop⟩) := by
-  if h : i.val = 0 then
-    apply isTrue; ext; simp [h]
-  else
-    apply isFalse; contrapose! h; simp [h]
-
-noncomputable instance (i: ({0,1}:Set)): Decidable (i = ⟨1, by aesop⟩) := by
-  if h : i.val = 1 then
-    apply isTrue; ext; simp [h]
-  else
-    apply isFalse; contrapose! h; simp [h]
-
-
--/
-
-noncomputable instance : DecidableEq ({(0:Object), (1:Object)} : Set).toSubtype := by
-  intro x y
-  if hx : x = ⟨0, by aesop⟩  then
-  · if hy: y = ⟨0, by aesop⟩ then
-      apply isTrue; simp_all
-    else
-      apply isFalse; rw [hx]; contrapose! hy; simp [hy]
-  else
-  · if hy : y = ⟨0, by aesop⟩ then
-    · apply isFalse; rw [hy]; exact hx
-    else
-      apply isTrue
-      have hx' := x.prop; have hy' := y.prop; simp at hx' hy'
-      rw [← coe_inj ] at *;
-      simp_all
-
-noncomputable instance : Fintype ({0, 1} : Set).toSubtype where
-  elems := {⟨0, by aesop⟩ , ⟨1, by aesop⟩ }
-  complete := by
-    intro ⟨x, hx⟩; simp at *
-    rwa [SetTheory.Set.mem_pair] at hx
-
--- In inv_fun below, We want to prove f i ∈ X i
-  -- f 1 has a built-in proof of f 1 ∈ X 1, so we just need to substitute i
-  -- ▸ can shorthand this subtitution
-
-abbrev SetTheory.Set.zero' : ({0,1}:Set) := ⟨0, by aesop⟩
-abbrev SetTheory.Set.one' : ({0,1}:Set) := ⟨1, by aesop⟩
-
-lemma SetTheory.Set.eq0' (i : Object) :
-i = 0 ↔ i = (⟨0, by aesop⟩: ({0,1}:Set)) := by simp
-lemma SetTheory.Set.eq1' (i : Object) :
-i = 1 ↔ i = (⟨1, by aesop⟩: ({0,1}:Set)) := by simp
 
 /-- Example 3.5.10 -/
 noncomputable abbrev SetTheory.Set.iProd_equiv_prod (X: ({0,1}:Set) → Set) :
-    iProd X ≃ (X zero') ×ˢ (X one') where
-  toFun t := mk_cartesian (t zero') (t one')
-  invFun z := (
-  fun i : ({0,1}:Set) =>
-    if h0 : i = zero' then h0 ▸ left z
-    else if h1 : i = one' then h1 ▸ right z
-    else absurd i.prop (by rw [← coe_inj ] at *; simp_all)
-  : ∀ i, X i)
-  left_inv t := by -- f⁻¹ f t splits and then re-creates t
-    simp only [Equiv.symm_apply_eq]; ext i; have hi := i.prop
-    simp [eq0', eq1'] at hi; rw [coe_inj, coe_inj] at hi -- Get cases
-    rcases hi with rfl | rfl <;> simp
+    iProd X ≃ (X ⟨ 0, by simp ⟩) ×ˢ (X ⟨ 1, by simp ⟩) where
+  toFun := sorry
+  invFun := sorry
+  left_inv := sorry
+  right_inv := sorry
 
-  right_inv z:= by
-    ext; rw [pair_eq_left_right, pair_eq_left_right]; congr 1;
-    rw [left_of_mk_cartesian, right_of_mk_cartesian]
-    ext <;> simp only [Equiv.apply_symm_apply] <;> congr; simp
-
-abbrev SetTheory.Set.zero : ({0,1,2}:Set) := ⟨0, by aesop⟩
-abbrev SetTheory.Set.one : ({0,1,2}:Set) := ⟨1, by aesop⟩
-abbrev SetTheory.Set.two : ({0,1,2}:Set) := ⟨2, by aesop⟩
-
-lemma SetTheory.Set.eq0 (i : Object) :
-i = 0 ↔ i = (⟨0, by aesop⟩: ({0,1,2}:Set)) := by simp
-lemma SetTheory.Set.eq1 (i : Object) :
-i = 1 ↔ i = (⟨1, by aesop⟩: ({0,1,2}:Set)) := by simp
-lemma SetTheory.Set.eq2 (i : Object) :
-i = 2 ↔ i = (⟨2, by aesop⟩: ({0,1,2}:Set)) := by simp
-
-open Classical in
-/-- Example 3.5.10: similar to previous instance -/
+/-- Example 3.5.10 -/
 noncomputable abbrev SetTheory.Set.iProd_equiv_prod_triple (X: ({0,1,2}:Set) → Set) :
-    iProd X ≃ (X zero) ×ˢ (X one) ×ˢ (X two) where
-  toFun t := mk_cartesian (t zero) (mk_cartesian (t one) (t two))
-  invFun z := (
-  fun i : ({0,1,2}:Set) =>
-    if h0 : i = zero then h0 ▸ left z
-    else if h1 : i = one then h1 ▸ left (right z)
-    else if h2 : i = two then h2 ▸ right (right z)
-    else absurd i.prop (by rw [← coe_inj ] at *; simp_all)
-  : ∀ i, X i)
-  left_inv t := by -- f⁻¹ f t splits and then re-creates t
-    simp only [Equiv.symm_apply_eq]; ext i; have hi := i.prop
-    simp [eq0, eq1, eq2] at hi; repeat rw [coe_inj] at hi -- Get cases
-    rcases hi with rfl | rfl | rfl <;> simp
-  right_inv z := by
-    ext; repeat rw [pair_eq_left_right];
-    congr 1;
-    repeat rw [left_of_mk_cartesian, right_of_mk_cartesian]
-    ext <;> simp only [Equiv.apply_symm_apply] <;> congr <;> simp
+    iProd X ≃ (X ⟨ 0, by simp ⟩) ×ˢ (X ⟨ 1, by simp ⟩) ×ˢ (X ⟨ 2, by simp ⟩) where
+  toFun := sorry
+  invFun := sorry
+  left_inv := sorry
+  right_inv := sorry
 
 /-- Connections with Mathlib's `Set.pi` -/
 noncomputable abbrev SetTheory.Set.iProd_equiv_pi (I:Set) (X: I → Set) :
@@ -479,7 +388,7 @@ abbrev SetTheory.Set.Fin (n:ℕ) : Set := nat.specify (fun m ↦ (m:ℕ) < n)
 
 theorem SetTheory.Set.mem_Fin (n:ℕ) (x:Object) : x ∈ Fin n ↔ ∃ m, m < n ∧ x = m := by
   rw [specification_axiom'']; constructor
-  · intro ⟨ h1, h2 ⟩; use (⟨ x, h1 ⟩:nat); simp [h2]
+  . intro ⟨ h1, h2 ⟩; use ↑(⟨ x, h1 ⟩:nat); simp [h2]
   intro ⟨ m, hm, h ⟩
   use (by rw [h, ←Object.ofnat_eq]; exact (m:nat).prop)
   grind [Object.ofnat_eq''']
@@ -496,8 +405,6 @@ noncomputable abbrev SetTheory.Set.Fin.toNat {n:ℕ} (i: Fin n) : ℕ := (mem_Fi
 noncomputable instance SetTheory.Set.Fin.inst_coeNat {n:ℕ} : CoeOut (Fin n) ℕ where
   coe := toNat
 
--- Fin n → ℕ → Fin n can be canceled out to Fin n
--- Since (i:ℕ) is literally defined as "the number that can be used to generate i with Fin_mk"
 theorem SetTheory.Set.Fin.toNat_spec {n:ℕ} (i: Fin n) :
     ∃ h : i < n, i = Fin_mk n i h := (mem_Fin' i).choose_spec
 
@@ -505,22 +412,15 @@ theorem SetTheory.Set.Fin.toNat_lt {n:ℕ} (i: Fin n) : i < n := (toNat_spec i).
 
 @[simp]
 theorem SetTheory.Set.Fin.coe_toNat {n:ℕ} (i: Fin n) : ((i:ℕ):Object) = (i:Object) := by
-  set j := (i:ℕ); obtain ⟨ h, h':i = Fin_mk n j h ⟩ := toNat_spec i; rw [h', Fin_mk, constr_object]
-
--- (i : Fin n) contains itself cast to (i : ℕ)
--- The outer layer of Fin n is just a proof, which the object cast
--- destroys anyway
--- So we're just left with (i:ℕ) inside
-theorem SetTheory.Set.Fin.coe_toNat' {n:ℕ} (i: Fin n) : ((i:ℕ):Object) = (i:Object) := by
-  obtain ⟨ h, h'⟩ := toNat_spec i;
-  rw [← coe_inj, Fin_mk] at h'; rw [h']
+  set j := (i:ℕ); obtain ⟨ h, h':i = Fin_mk n j h ⟩ := toNat_spec i; rw [h']
 
 @[simp low]
 lemma SetTheory.Set.Fin.coe_inj {n:ℕ} {i j: Fin n} : i = j ↔ (i:ℕ) = (j:ℕ) := by
-  refine ⟨by rintro rfl; rfl, ?_⟩
+  constructor
+  · simp_all
   obtain ⟨_, hi⟩ := toNat_spec i
   obtain ⟨_, hj⟩ := toNat_spec j
-  grind -- If they contain the same natural number, they construct the same Fin n term
+  grind
 
 @[simp]
 theorem SetTheory.Set.Fin.coe_eq_iff {n:ℕ} (i: Fin n) {j:ℕ} : (i:Object) = (j:Object) ↔ i = j := by
@@ -529,10 +429,8 @@ theorem SetTheory.Set.Fin.coe_eq_iff {n:ℕ} (i: Fin n) {j:ℕ} : (i:Object) = (
     rw [Subtype.coe_eq_iff] at h
     obtain ⟨_, rfl⟩ := h
     simp [←Object.natCast_inj]
-  rintro rfl
-  simp_all only [coe_toNat]
+  aesop
 
--- Shifting (i : Fin n) to (i : Fin m) doesn't change the underlying natural number
 @[simp]
 theorem SetTheory.Set.Fin.coe_eq_iff' {n m:ℕ} (i: Fin n) (hi : ↑i ∈ Fin m) : ((⟨i, hi⟩ : Fin m):ℕ) = (i:ℕ) := by
   obtain ⟨val, property⟩ := i
@@ -544,72 +442,53 @@ theorem SetTheory.Set.Fin.coe_eq_iff' {n m:ℕ} (i: Fin n) (hi : ↑i ∈ Fin m)
   have := h2.choose_spec
   grind
 
--- ℕ → Fin n → ℕ can be canceled out to ℕ
 @[simp]
 theorem SetTheory.Set.Fin.toNat_mk {n:ℕ} (m:ℕ) (h: m < n) : (Fin_mk n m h : ℕ) = m := by
   have := coe_toNat (Fin_mk n m h)
   rwa [Object.natCast_inj] at this
 
--- Lift (i : Fin n) to some larger (i : Fin N)
 abbrev SetTheory.Set.Fin_embed (n N:ℕ) (h: n ≤ N) (i: Fin n) : Fin N := ⟨ i.val, by
   have := i.prop; rw [mem_Fin] at *; grind
 ⟩
-
-
 
 /-- Connections with Mathlib's `Fin n` -/
 noncomputable abbrev SetTheory.Set.Fin.Fin_equiv_Fin (n:ℕ) : Fin n ≃ _root_.Fin n where
   toFun m := _root_.Fin.mk m (toNat_lt m)
   invFun m := Fin_mk n m.val m.isLt
-  -- Pretty simple, because toFun and invFun both cast their counterparts to ℕ
-  -- (Note that the following indicates the types that some input passed through, rather than the actual function type signature)
-  -- So, Fintype 1 → Fintype 2 → Fintype 1 becomes
-  -- Fintype 1 → ℕ → Fintype 2 → ℕ → Fintype 1
-  -- Fintype 1 → (ℕ → Fintype 2 → ℕ ) → Fintype 1
-  -- Fintype 1 → ℕ → Fintype 1
-  -- Fintype 1
-
   left_inv m := (toNat_spec m).2.symm
   right_inv m := by simp
 
-theorem SetTheory.Set.nonempty_of_inhabited' {X:Set} (x : X): X ≠ ∅ := nonempty_of_inhabited x.prop
-
+/-- Lemma 3.5.11 (finite choice) -/
 theorem SetTheory.Set.finite_choice {n:ℕ} {X: Fin n → Set} (h: ∀ i, X i ≠ ∅) : iProd X ≠ ∅ := by
   -- This proof broadly follows the one in the text
   -- (although it is more convenient to induct from 0 rather than 1)
   induction' n with n hn
-  · have : Fin 0 = ∅ := by
+  . have : Fin 0 = ∅ := by
       rw [eq_empty_iff_forall_notMem]
-      grind [specification_axiom''] -- (m : ℕ) < 0 is impossible
-    let f i : X i := absurd i.property (by simp)
-    apply nonempty_of_inhabited' f -- Use empty function
-  -- Set up to invoke inductive case
+      grind [specification_axiom'']
+    have empty (i:Fin 0) : X i := False.elim (by rw [this] at i; exact not_mem_empty i i.prop)
+    apply nonempty_of_inhabited (x := tuple empty); rw [mem_iProd]; use empty
   set X' : Fin n → Set := fun i ↦ X (Fin_embed n (n+1) (by linarith) i)
   have hX' (i: Fin n) : X' i ≠ ∅ := h _
-  choose x' hx' using nonempty_def (hn hX') -- Induction gives func
-  lift x' to iProd X' using hx'
+  choose x'_obj hx' using nonempty_def (hn hX')
+  rw [mem_iProd] at hx'; obtain ⟨ x', rfl ⟩ := hx'
   set last : Fin (n+1) := Fin_mk (n+1) n (by linarith)
-  choose z hz using nonempty_def (h last)
-
-  have x : ∀ i, X i := fun i ↦
+  choose a ha using nonempty_def (h last)
+  have x : ∀ i, X i := fun i =>
     if h : i = n then
-      ⟨z, by convert hz; unfold last; ext; simp [h]⟩
+      have : i = last := by ext; simpa [←Fin.coe_toNat, last]
+      ⟨a, by grind⟩
     else
-      let z := x' (Fin_mk n i (by have := Fin.toNat_lt i; omega ))
-      ⟨z, by convert z.prop using 1; simp [X']; congr; ext; simp⟩
-  exact nonempty_of_inhabited (x : iProd X).prop
+      have : i < n := lt_of_le_of_ne (Nat.lt_succ_iff.mp (Fin.toNat_lt i)) h
+      let i' := Fin_mk n i this
+      have : X i = X' i' := by simp [X', i', Fin_embed]
+      ⟨x' i', by grind⟩
+  exact nonempty_of_inhabited (tuple_mem_iProd x)
 
-
-#check SetTheory.Set.axiom_of_regularity
-#check SetTheory.Set.not_mem_self
-#check SetTheory.Set.not_mem_mem
 /-- Exercise 3.5.1, second part (requires axiom of regularity) -/
 abbrev OrderedPair.toObject' : OrderedPair ↪ Object where
-  toFun p  := ({ p.1, (({p.1, p.2}:Set):Object) }:Set)
-  inj' a b hab := by
-    ext; simp at hab
-    by_contra hneg
-    sorry;sorry
+  toFun p := ({ p.1, (({p.1, p.2}:Set):Object) }:Set)
+  inj' := by sorry
 
 /-- An alternate definition of a tuple, used in Exercise 3.5.2 -/
 structure SetTheory.Set.Tuple (n:ℕ) where

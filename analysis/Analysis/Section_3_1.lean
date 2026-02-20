@@ -193,6 +193,8 @@ theorem SetTheory.Set.nonempty_of_inhabited {X:Set} {x:Object} (h:x âˆˆ X) : X â
   rw [eq_empty_iff_forall_notMem] at h
   exact h x
 
+
+
 instance SetTheory.Set.instSingleton : Singleton Object Set where
   singleton := singleton
 
