@@ -420,9 +420,9 @@ noncomputable abbrev SetTheory.Set.iProd_equiv_prod (X: ({0,1}:Set) → Set) :
     rw [left_of_mk_cartesian, right_of_mk_cartesian]
     ext <;> simp only [Equiv.apply_symm_apply] <;> congr; simp
 
-abbrev SetTheory.Set.zero : ({0,1,2}:Set) := ⟨0, by aesop⟩
-abbrev SetTheory.Set.one : ({0,1,2}:Set) := ⟨1, by aesop⟩
-abbrev SetTheory.Set.two : ({0,1,2}:Set) := ⟨2, by aesop⟩
+abbrev SetTheory.Set.zero'' : ({0,1,2}:Set) := ⟨0, by aesop⟩
+abbrev SetTheory.Set.one'' : ({0,1,2}:Set) := ⟨1, by aesop⟩
+abbrev SetTheory.Set.two'' : ({0,1,2}:Set) := ⟨2, by aesop⟩
 
 lemma SetTheory.Set.eq0 (i : Object) :
 i = 0 ↔ i = (⟨0, by aesop⟩: ({0,1,2}:Set)) := by simp
@@ -434,13 +434,13 @@ i = 2 ↔ i = (⟨2, by aesop⟩: ({0,1,2}:Set)) := by simp
 open Classical in
 /-- Example 3.5.10: similar to previous instance -/
 noncomputable abbrev SetTheory.Set.iProd_equiv_prod_triple (X: ({0,1,2}:Set) → Set) :
-    iProd X ≃ (X zero) ×ˢ (X one) ×ˢ (X two) where
-  toFun t := mk_cartesian (t zero) (mk_cartesian (t one) (t two))
+    iProd X ≃ (X zero'') ×ˢ (X one'') ×ˢ (X two'') where
+  toFun t := mk_cartesian (t zero'') (mk_cartesian (t one'') (t two''))
   invFun z := (
   fun i : ({0,1,2}:Set) =>
-    if h0 : i = zero then h0 ▸ left z
-    else if h1 : i = one then h1 ▸ left (right z)
-    else if h2 : i = two then h2 ▸ right (right z)
+    if h0 : i = zero'' then h0 ▸ left z
+    else if h1 : i = one'' then h1 ▸ left (right z)
+    else if h2 : i = two'' then h2 ▸ right (right z)
     else absurd i.prop (by rw [← coe_inj ] at *; simp_all)
   : ∀ i, X i)
   left_inv t := by -- f⁻¹ f t splits and then re-creates t
@@ -603,13 +603,37 @@ theorem SetTheory.Set.finite_choice {n:ℕ} {X: Fin n → Set} (h: ∀ i, X i �
 #check SetTheory.Set.axiom_of_regularity
 #check SetTheory.Set.not_mem_self
 #check SetTheory.Set.not_mem_mem
+
+lemma SetTheory.Set.mem_pair_eq_pair
+(h : {a,b} = ({a,c}:Set)): b = c := by
+  by_contra h'
+  have h1 := congr_arg (b ∈ ·) h
+  have h2 := congr_arg (c ∈ ·) h
+  simp at h1 h2
+  rcases h1 with rfl | rfl <;> rcases h2 with rfl | h <;> simp_all
+
+abbrev sto := SetTheory.set_to_object
 /-- Exercise 3.5.1, second part (requires axiom of regularity) -/
 abbrev OrderedPair.toObject' : OrderedPair ↪ Object where
   toFun p  := ({ p.1, (({p.1, p.2}:Set):Object) }:Set)
   inj' a b hab := by
-    ext; simp at hab
-    by_contra hneg
-    sorry;sorry
+    simp at hab
+    have : a.1 = b.1 := by
+      by_contra h -- Single elems not equal each other, must equal pair
+      have ha := congr_arg (a._1 ∈ ·) hab
+      have hb := congr_arg (b._1 ∈ ·) hab
+      simp [h] at ha;
+      have h' := Ne.symm h; simp [h'] at hb
+      convert SetTheory.Set.not_mem_mem; simp
+      refine ⟨{b._1, b._2}, {a._1, a._2}, ?_⟩
+      simp [← ha, ← hb]
+    ext; exact this
+    rw [← this] at hab
+    apply mem_pair_eq_pair at hab
+    simp at hab
+    apply mem_pair_eq_pair at hab
+    exact hab
+
 
 /-- An alternate definition of a tuple, used in Exercise 3.5.2 -/
 structure SetTheory.Set.Tuple (n:ℕ) where
@@ -631,115 +655,390 @@ lemma SetTheory.Set.Tuple.ext {n:ℕ} {t t':Tuple n}
 
 /-- Exercise 3.5.2 -/
 theorem SetTheory.Set.Tuple.eq {n:ℕ} (t t':Tuple n) :
-    t = t' ↔ ∀ n : Fin n, ((t.x n):Object) = ((t'.x n):Object) := by sorry
+t = t' ↔ ∀ n : Fin n, ((t.x n):Object) = ((t'.x n):Object) := by
+  refine ⟨by rintro rfl; simp, ?_⟩
+  intro h; ext x
+  · constructor <;> intro hX
+    · choose i hi using t.surj ⟨x, hX⟩
+      convert ((t'.x i)).property
+      rw [← h i, hi]
+    · choose i hi using t'.surj ⟨x, hX⟩
+      convert ((t.x i)).property
+      rw [h i, hi]
+  apply h
 
 noncomputable abbrev SetTheory.Set.iProd_equiv_tuples (n:ℕ) (X: Fin n → Set) :
-    iProd X ≃ { t:Tuple n // ∀ i, (t.x i:Object) ∈ X i } where
-  toFun := sorry
-  invFun := sorry
-  left_inv := sorry
-  right_inv := sorry
+    iProd X ≃ { s:Tuple n // ∀ i, (s.x i:Object) ∈ X i } where
+  toFun := fun t ↦
+    let Z := (Fin n).replace
+      (P := fun i fi ↦ fi = t i) (by aesop)
+    let f : Fin n → Z := fun i ↦
+      ⟨t i, by rw [replacement_axiom]; use i⟩
+    let fsurj : Function.Surjective f := by
+      intro y; have := y.prop; rw [replacement_axiom] at this;
+      choose i hi using this; use i; rw [← coe_inj, hi]
+    ⟨Tuple.mk Z f fsurj, by intro i; simp; convert (t i).prop⟩
+  invFun s := ( fun i ↦ ⟨s.val.x i, s.prop i⟩ : ∀ i, X i)
+  left_inv t := by -- iProd → Tuple → iProd
+    simp; generalize_proofs h1 _ -- iProd elems are fully defined by their function
+    ext; simp;
+    conv => rhs; rw [h1.choose_spec] -- The function passes through toFun and invFun basically unaffected
+  right_inv s:= by -- Tuple → iProd → Tuple
+    simp; rw [← Subtype.coe_inj];
+    generalize_proofs h1 h2 h3 h4 h5 h6
+    have := h2.choose_spec; rw [tuple_inj] at this
+    simp_rw [← this]
+    ext x -- Need to check set AND function
+    · simp only; rw [replacement_axiom]; -- Set elems are the outputs of the function s.x: s.x was preserved through toFun and invFun
+      rw [← this]
+      constructor <;> intro h
+      · choose i hi using h; convert (s.val.x i).prop -- s.x can only generate elements of s.X
+      choose i hi using s.val.surj ⟨x, h⟩; rw [← coe_inj] at hi; simp at hi
+      rw [← hi]; use i -- s.X is surjective: every element will be generated by some s.x i
+    simp -- Function passed through unaffected
 
 /--
   Exercise 3.5.3. The spirit here is to avoid direct rewrites (which make all of these claims
   trivial), and instead use `OrderedPair.eq` or `SetTheory.Set.tuple_inj`
 -/
-theorem OrderedPair.refl (p: OrderedPair) : p = p := by sorry
+theorem OrderedPair.refl (p: OrderedPair) : p = p := by
+  rw [OrderedPair.eq]; simp
 
-theorem OrderedPair.symm (p q: OrderedPair) : p = q ↔ q = p := by sorry
+theorem OrderedPair.symm (p q: OrderedPair) : p = q ↔ q = p := by
+  repeat rw [OrderedPair.eq];
+  constructor <;> intro h <;> exact ⟨h.1.symm, h.2.symm⟩
 
-theorem OrderedPair.trans {p q r: OrderedPair} (hpq: p=q) (hqr: q=r) : p=r := by sorry
+
+theorem OrderedPair.trans {p q r: OrderedPair} (hpq: p=q) (hqr: q=r) : p=r := by
+  rw [OrderedPair.eq] at *;
+  rw [hpq.1, hpq.2, hqr.1, hqr.2]; simp -- Did rws, but not of the original p,q,r
+
 
 theorem SetTheory.Set.tuple_refl {I:Set} {X: I → Set} (a: ∀ i, X i) :
-    tuple a = tuple a := by sorry
+  tuple a = tuple a := by
+  apply (tuple_inj _ _).mpr
+  ext; rfl
 
 theorem SetTheory.Set.tuple_symm {I:Set} {X: I → Set} (a b: ∀ i, X i) :
-    tuple a = tuple b ↔ tuple b = tuple a := by sorry
+  tuple a = tuple b ↔ tuple b = tuple a := by
+  repeat rw [tuple_inj]
+  constructor <;> intro h <;> ext i <;> simp [h]
 
 theorem SetTheory.Set.tuple_trans {I:Set} {X: I → Set} {a b c: ∀ i, X i}
   (hab: tuple a = tuple b) (hbc : tuple b = tuple c) :
-    tuple a = tuple c := by sorry
+tuple a = tuple c := by
+  rw [tuple_inj] at *;
+  ext i; apply congr_fun at hab; apply congr_fun at hbc;
+  rw [hab, hbc]
 
 /-- Exercise 3.5.4 -/
-theorem SetTheory.Set.prod_union (A B C:Set) : A ×ˢ (B ∪ C) = (A ×ˢ B) ∪ (A ×ˢ C) := by sorry
+theorem SetTheory.Set.prod_union (A B C:Set) : A ×ˢ (B ∪ C) = (A ×ˢ B) ∪ (A ×ˢ C) := by
+  ext i; simp_rw [mem_union, mem_cartesian]
+  constructor
+  · rintro ⟨x, y, _⟩; subst i; have := y.prop; simp at this;
+    rcases this with h | h <;> simp [h]
+  intro h ; rcases h with ⟨x, y, _⟩ | ⟨x, y, _⟩ <;> subst i <;>
+    use x <;> use ⟨y, by aesop⟩
 
 /-- Exercise 3.5.4 -/
-theorem SetTheory.Set.prod_inter (A B C:Set) : A ×ˢ (B ∩ C) = (A ×ˢ B) ∩ (A ×ˢ C) := by sorry
+theorem SetTheory.Set.prod_inter (A B C:Set) : A ×ˢ (B ∩ C) = (A ×ˢ B) ∩ (A ×ˢ C) := by
+  ext i; simp_rw [mem_inter, mem_cartesian]
+  constructor
+  · rintro ⟨x, y, _⟩; subst i; have := y.prop; simp at this;
+    constructor <;> refine ⟨x, ⟨y, by aesop⟩, rfl⟩
+  rintro ⟨⟨x1, y1, h1⟩, ⟨x2, y2, h2⟩⟩; subst i; simp at h2;
+  have := y2.prop; rw [h2.2.symm] at *
+  use x1; use ⟨y1, by simp [y1.prop, this]⟩
+
+#check mk_cartesian_left_right_eq
+
 
 /-- Exercise 3.5.4 -/
-theorem SetTheory.Set.prod_diff (A B C:Set) : A ×ˢ (B \ C) = (A ×ˢ B) \ (A ×ˢ C) := by sorry
+theorem SetTheory.Set.prod_diff (A B C:Set) : A ×ˢ (B \ C) = (A ×ˢ B) \ (A ×ˢ C) := by
+  ext i; simp_rw [mem_sdiff, mem_cartesian]
+  constructor -- Use contradiction: if it's in one set but not the other, y is in and not in C
+  · rintro ⟨x, y, _⟩; subst i;
+    refine ⟨?hxy, ?_⟩ -- Refine lets me keep the first goal while proving the second
+    · use x; use ⟨y, by aesop⟩
+    choose a b h using ?hxy; simp at h;
+    by_contra hc; choose c d hc using hc; simp at hc
+    aesop -- y ∈ C and y ∉ C
+  rintro ⟨⟨x,y,h1⟩, h2⟩; subst h1
+  suffices y.val ∉ C by use x; use ⟨y, by aesop⟩
+  contrapose! h2; use x; use ⟨y, by aesop⟩;
+
+
 
 /-- Exercise 3.5.4 -/
-theorem SetTheory.Set.union_prod (A B C:Set) : (A ∪ B) ×ˢ C = (A ×ˢ C) ∪ (B ×ˢ C) := by sorry
+theorem SetTheory.Set.union_prod (A B C:Set) : (A ∪ B) ×ˢ C = (A ×ˢ C) ∪ (B ×ˢ C) := by
+  ext i; simp_rw [mem_union, mem_cartesian]
+  constructor
+  · rintro ⟨x, y, _⟩; subst i; simp; convert x.prop; simp
+  intro h ; rcases h with ⟨x, y, _⟩ | ⟨x, y, _⟩ <;> subst i <;>
+  use ⟨x, by aesop⟩ <;> use y
 
 /-- Exercise 3.5.4 -/
-theorem SetTheory.Set.inter_prod (A B C:Set) : (A ∩ B) ×ˢ C = (A ×ˢ C) ∩ (B ×ˢ C) := by sorry
+theorem SetTheory.Set.inter_prod (A B C:Set) : (A ∩ B) ×ˢ C = (A ×ˢ C) ∩ (B ×ˢ C) := by
+  ext i; simp_rw [mem_inter, mem_cartesian]
+  constructor
+  · rintro ⟨x, y, _⟩; subst i; simp; convert x.prop; simp
+  rintro ⟨⟨x1, y1, h1⟩, ⟨x2, y2, h2⟩⟩; subst i; simp at *;
+  aesop
 
 /-- Exercise 3.5.4 -/
-theorem SetTheory.Set.diff_prod (A B C:Set) : (A \ B) ×ˢ C = (A ×ˢ C) \ (B ×ˢ C) := by sorry
+theorem SetTheory.Set.diff_prod (A B C:Set) : (A \ B) ×ˢ C = (A ×ˢ C) \ (B ×ˢ C) := by
+  ext i; simp_rw [mem_sdiff, mem_cartesian];
+  constructor
+  · rintro ⟨x, y, _⟩; subst i; simp; convert x.prop; simp
+  rintro ⟨⟨x,y,h1⟩, h2⟩; subst i; simp at *; aesop
 
 /-- Exercise 3.5.5 -/
 theorem SetTheory.Set.inter_of_prod (A B C D:Set) :
-    (A ×ˢ B) ∩ (C ×ˢ D) = (A ∩ C) ×ˢ (B ∩ D) := by sorry
+    (A ×ˢ B) ∩ (C ×ˢ D) = (A ∩ C) ×ˢ (B ∩ D) := by
+  ext i; simp_rw [mem_inter, mem_cartesian]; symm
+  constructor
+  · intro ⟨x, y, _⟩; subst i; simp; aesop
+  rintro ⟨⟨x1, y1, h1⟩, ⟨x2, y2, h2⟩⟩; subst i; simp at *;
+  nth_rw 2 [h2.1, h2.2]; aesop
+
+@[simp]
+lemma SetTheory.Set.empty_prod (A : Set) : (∅:Set) ×ˢ A = (∅:Set) := by ext i; simp
+
+@[simp]
+lemma SetTheory.Set.prod_empty (A : Set) : A ×ˢ (∅:Set) = (∅:Set) := by ext i; rw [mem_cartesian]; simp
+
 
 /- Exercise 3.5.5 -/
 def SetTheory.Set.union_of_prod :
   Decidable (∀ (A B C D:Set), (A ×ˢ B) ∪ (C ×ˢ D) = (A ∪ C) ×ˢ (B ∪ D)) := by
   -- the first line of this construction should be `apply isTrue` or `apply isFalse`.
-  sorry
+  apply isFalse; push_neg;
+  refine ⟨{1}, ∅, ∅, {1}, ?_ ⟩; simp
+  rw [SetTheory.Set.ext_iff]
+  push_neg; use OrderedPair.mk 1 1; simp
+
+@[simp]
+lemma SetTheory.Set.sdiff_self (A : Set) : A \ A = ∅ := by ext i; simp
+
+@[simp]
+lemma SetTheory.Set.sdiff_empty (A : Set) : A \ ∅ = A := by ext i; simp
 
 /- Exercise 3.5.5 -/
 def SetTheory.Set.diff_of_prod :
   Decidable (∀ (A B C D:Set), (A ×ˢ B) \ (C ×ˢ D) = (A \ C) ×ˢ (B \ D)) := by
   -- the first line of this construction should be `apply isTrue` or `apply isFalse`.
-  sorry
+  apply isFalse; push_neg
+  refine ⟨{1}, {1}, {1}, ∅, ?_⟩; simp
+  rw [SetTheory.Set.ext_iff]; simp
 
 /--
   Exercise 3.5.6.
 -/
+lemma SetTheory.Set.nonempty_def' {X:Set} : X ≠ ∅ ↔ ∃ x, x ∈ X := by
+  refine ⟨nonempty_def, ?_⟩; intro h; apply nonempty_of_inhabited; apply h.choose_spec
+
+
 theorem SetTheory.Set.prod_subset_prod {A B C D:Set}
-  (hA: A ≠ ∅) (hB: B ≠ ∅) (hC: C ≠ ∅) (hD: D ≠ ∅) :
-    A ×ˢ B ⊆ C ×ˢ D ↔ A ⊆ C ∧ B ⊆ D := by sorry
+(hA: A ≠ ∅) (hB: B ≠ ∅) (hC: C ≠ ∅) (hD: D ≠ ∅) :
+A ×ˢ B ⊆ C ×ˢ D ↔ A ⊆ C ∧ B ⊆ D := by
+  rw [nonempty_def'] at *
+  choose a ha using hA; choose b hb using hB; choose c hc using hC; choose d hd using hD
+  constructor <;> intro h
+  · constructor <;> intro x hx
+    · have : (OrderedPair.mk x b: Object) ∈ A ×ˢ B := by rw [mem_cartesian]; simp [hx, hb]
+      apply h at this; simp at this; exact this.1
+    · have : (OrderedPair.mk a x: Object) ∈ A ×ˢ B := by rw [mem_cartesian]; simp [ha, hx]
+      apply h at this; simp at this; exact this.2
+  intro z hz; rw [mem_cartesian] at *; choose x y hz using hz; subst z
+  use ⟨x, h.1 _ x.prop⟩; use ⟨y, h.2 _ y.prop⟩
 
 def SetTheory.Set.prod_subset_prod' :
   Decidable (∀ (A B C D:Set), A ×ˢ B ⊆ C ×ˢ D ↔ A ⊆ C ∧ B ⊆ D) := by
   -- the first line of this construction should be `apply isTrue` or `apply isFalse`.
-  sorry
+  apply isFalse; push_neg -- Cartesians are empty, but that only requires one of the two sets that make it up to be
+  refine ⟨∅,{1},∅,∅, ?_⟩; left; simp -- Instantly satisfies left side by making cartesians empty
+  simp [subset_def] -- But right side is not: B can be nonempty without making A × B nonempty
+
 
 /-- Exercise 3.5.7 -/
 theorem SetTheory.Set.direct_sum {X Y Z:Set} (f: Z → X) (g: Z → Y) :
-    ∃! h: Z → X ×ˢ Y, left ∘ h = f ∧ right ∘ h = g := by sorry
+∃! h: Z → X ×ˢ Y, left ∘ h = f ∧ right ∘ h = g := by
+  apply existsUnique_of_exists_of_unique
+  · use fun z ↦ mk_cartesian (f z) (g z)
+    constructor <;> ext i <;> simp
+  intro f1 f2 hf1 hf2
+  ext z; repeat rw [pair_eq_left_right]
+  simp;
+  rw [← hf2.1, ← hf2.2] at hf1
+  constructor <;> congr 1
+  apply congr_fun hf1.1; apply congr_fun hf1.2
 
 /-- Exercise 3.5.8 -/
 @[simp]
 theorem SetTheory.Set.iProd_empty_iff {n:ℕ} {X: Fin n → Set} :
-    iProd X = ∅ ↔ ∃ i, X i = ∅ := by sorry
+iProd X = ∅ ↔ ∃ i, X i = ∅ := by
+  constructor <;> intro h
+  · contrapose! h; simp_rw [nonempty_def'] at *
+    let w := ((fun i ↦ ⟨(h i).choose, (h i).choose_spec⟩ : ∀ i, X i): iProd X)
+    refine ⟨w, w.prop⟩
+  by_contra! ht; rw [nonempty_def'] at ht;
+  choose t ht using ht; lift t to iProd X using ht
+  choose i hi using h
+  suffices (t i).val ∈ (∅:Set) by simp_all
+  rw [← hi]; apply (t i).prop
 
 /-- Exercise 3.5.9-/
 theorem SetTheory.Set.iUnion_inter_iUnion {I J: Set} (A: I → Set) (B: J → Set) :
-    (iUnion I A) ∩ (iUnion J B) = iUnion (I ×ˢ J) (fun p ↦ (A (left p)) ∩ (B (right p))) := by sorry
+(iUnion I A) ∩ (iUnion J B) = iUnion (I ×ˢ J) (fun p ↦ (A (left p)) ∩ (B (right p))) := by
+  ext a; simp_rw [mem_inter, mem_iUnion]
+  constructor
+  · rintro ⟨⟨i, hi⟩, ⟨j, hj⟩⟩; use mk_cartesian i j; simp; exact ⟨hi, hj⟩
+  rintro ⟨z, hz⟩; simp at hz
+  refine ⟨⟨left z, hz.1⟩, ⟨right z, hz.2⟩⟩
 
 abbrev SetTheory.Set.graph {X Y:Set} (f: X → Y) : Set :=
   (X ×ˢ Y).specify (fun p ↦ (f (left p) = right p))
 
 /-- Exercise 3.5.10 -/
 theorem SetTheory.Set.graph_inj {X Y:Set} (f f': X → Y) :
-    graph f = graph f' ↔ f = f' := by sorry
+graph f = graph f' ↔ f = f' := by
+  refine ⟨?_, by rintro rfl; rfl ⟩
+  intro h; ext x
+  replace h := congr_arg ( (mk_cartesian x (f x)).val ∈ · ) h;
+  simp only at h; simp_rw [specification_axiom'] at h
+  simp at h; rw [h]
+
 
 theorem SetTheory.Set.is_graph {X Y G:Set} (hG: G ⊆ X ×ˢ Y)
-  (hvert: ∀ x:X, ∃! y:Y, ((⟨x,y⟩:OrderedPair):Object) ∈ G) :
-    ∃! f: X → Y, G = graph f := by sorry
+(hvert: ∀ x:X, ∃! y:Y, ((⟨x,y⟩:OrderedPair):Object) ∈ G) :
+∃! f: X → Y, G = graph f := by
+  apply existsUnique_of_exists_of_unique
+  · use (fun x ↦ (hvert x).choose)
+    ext z
+    constructor <;> intro h
+    · specialize hG _ h
+      lift z to (X ×ˢ Y) using hG -- We can generate (left z, (hvert x).choose) ∈ G
+      rw [specification_axiom']; simp only
+      set hvert := hvert (left z)
+      apply hvert.unique hvert.choose_spec.1
+      convert h; rw [pair_eq_left_right]
+    · rw [specification_axiom''] at h
+      choose hz h using h; simp at h
+      set w : X ×ˢ Y := ⟨ z, hz⟩
+      change w.val ∈ G
+      specialize hvert (left w)
+      convert hvert.choose_spec.1;
+      rw [pair_eq_left_right]; simp
+      congr; convert h.symm
+  intro f1 f2 h1 h2; symm at *;
+
+  rw [← graph_inj, h1, h2]
+
+#check SetTheory.Set.exists_powerset
+#check SetTheory.Set.mem_powerset
+
+
+
+/-
+let graphset := powset.specify (fun S ↦
+      ∃ f: Y → X, graph f = PSet S)
+    let funset := graphset.replace (P := fun G F ↦
+      G = graph F) ?_
+      -/
 
 /--
   Exercise 3.5.11. This trivially follows from `SetTheory.Set.powerset_axiom`, but the
   exercise is to derive it from `SetTheory.Set.exists_powerset` instead.
 -/
 theorem SetTheory.Set.powerset_axiom' (X Y:Set) :
-    ∃! S:Set, ∀(F:Object), F ∈ S ↔ ∃ f: Y → X, f = F := sorry
+∃! S:Set, ∀(F:Object), F ∈ S ↔ ∃ f: Y → X, f = F := by
+  apply existsUnique_of_exists_of_unique
+  · let powset := powerset (Y ×ˢ X)
+    let funset := powset.replace (P := fun S F ↦
+      ∃ f: Y → X, f = F ∧ PSet S = graph f) ?_
+    use funset; intro F; rw [replacement_axiom]
+    refine ⟨by intro ⟨_, h⟩; peel h with g h; exact h.1, ?_⟩
+    intro ⟨f, hf⟩
+    use ⟨graph f, by rw [mem_powerset]; use graph f; simp; apply specify_subset⟩
+    use f; simp [hf]; symm; apply PSet_prop'
+    · simp only; intro x F1 F2 ⟨⟨_,h1, h2⟩, ⟨_,h3, h4⟩⟩;
+      rw [← h1, ← h3]; simp; rw [← graph_inj, ← h2, ← h4]
+  rintro S1 S2 h1 h2; ext F; rw [h1, h2]
+
+
+
+
+theorem SetTheory.Set.recursion_finite (X: Set) (f: ℕ → X → X) (c:X) :
+∀ (n : ℕ), ∃ g : Fin (n+1) → X,
+g (Fin_mk _ 0 (by simp)) = c ∧
+∀ i (h: i < n), g (Fin_mk _ (i+1) (by omega)) = f i (g (Fin_mk _ i (by omega))) := by
+  intro n
+  induction' n with n ih
+  · simp; use fun i ↦ c
+  choose g hg0 hgih using ih;
+  let Q: Fin (n+2) → X := fun i ↦
+    if h2 : i < n+1 then
+      g (Fin_mk _ i h2)
+    else if h1 : i = n+1 then
+      f n (g (Fin_mk _ (n) (by linarith)))
+    else
+      absurd (by omega: ¬ (i < n+2)) (by push_neg; convert Fin.toNat_lt i)
+  use Q;
+  refine ⟨by rw [← hg0]; simp [Q], ?_⟩
+  intro i hi
+  by_cases h : i < n
+  · have hp1:i+1 < n+1 := by omega
+    simp [Q, h, hi]
+    exact hgih i h
+  simp [show i = n by omega,Q]
+
+-- recursion_finite with two different bounds are equal
+-- up to the min of those bounds
+theorem SetTheory.Set.recursion_eq (X: Set) (f: ℕ → X → X) (c:X)
+(n m i: ℕ) (hn: i < n+1) (hm: i < m+1):
+(recursion_finite X f c n).choose (Fin_mk _ i hn) =
+(recursion_finite X f c m).choose (Fin_mk _ i hm) := by
+  have hnr:= (recursion_finite X f c n).choose_spec
+  have hmr:= (recursion_finite X f c m).choose_spec
+  induction' i with i ih
+  · rw [hnr.1, hmr.1]
+  rw [hnr.2, hmr.2, ih]
+  linarith; linarith
+
+theorem SetTheory.Set.recursion' (X: Set) (f: ℕ → X → X) (c:X) :
+∃ a: ℕ → X, a 0 = c ∧ ∀ n, a (n + 1:ℕ) = f n (a n) := by
+  have hfin := recursion_finite X f c
+  let hg n:= (hfin n).choose_spec
+  let g n:= (hfin n).choose
+  use fun n ↦ g n (Fin_mk _ n (by simp))
+  refine ⟨by convert (hg 0).1, ?_⟩
+  intro n; simp
+  specialize hg (n+1); unfold g
+  rw [hg.2 _ (by linarith)]
+  congr 1
+  rw [recursion_eq X f c n (n+1) n (by simp) (by linarith) ]
+
+
+lemma SetTheory.Set.natcast_eq_nat_equiv (n:ℕ) : (n: nat) = nat_equiv n := rfl
 
 /-- Exercise 3.5.12, with errata from web site incorporated -/
 theorem SetTheory.Set.recursion (X: Set) (f: nat → X → X) (c:X) :
-    ∃! a: nat → X, a 0 = c ∧ ∀ n, a (n + 1:ℕ) = f n (a n) := by sorry
+∃! a: nat → X, a 0 = c ∧ ∀ n, a (n + 1:ℕ) = f n (a n) := by
+  apply existsUnique_of_exists_of_unique
+  · let ha := (recursion' X (fun n ↦ f (nat_equiv.symm n )) c)
+    use fun n ↦ ha.choose (nat_equiv n)
+    simp [ha.choose_spec]
+  intro f1 f2 h1 h2; ext n
+  rw [show n = nat_equiv (nat_equiv.symm n) by simp]
+  set m := nat_equiv.symm n
+  induction' m with m ih
+  · rw [show nat_equiv 0 = 0 by rfl]
+    rw [h1.1, h2.1]
+  rw [coe_inj] at ih;
+  unfold instNatCast at h1 h2
+  simp_rw [natcast_eq_nat_equiv] at h1 h2
+  rw [h1.2, h2.2, ih]
+
 
 /-- Exercise 3.5.13 -/
 theorem SetTheory.Set.nat_unique (nat':Set) (zero:nat') (succ:nat' → nat')
@@ -749,18 +1048,49 @@ theorem SetTheory.Set.nat_unique (nat':Set) (zero:nat') (succ:nat' → nat')
     ∧ ∀ (n:nat) (n':nat'), f n = n' ↔ f (n+1:ℕ) = succ n' := by
   have nat_coe_eq {m:nat} {n} : (m:ℕ) = n → m = n := by aesop
   have nat_coe_eq_zero {m:nat} : (m:ℕ) = 0 → m = 0 := nat_coe_eq
-  obtain ⟨f, hf⟩ := recursion nat' sorry sorry
+  have succ_inj n m: n = m ↔ succ n = succ m :=
+    ⟨by rintro rfl; rfl, by convert (succ_of_ne n m).mt; simp; simp⟩
+  obtain ⟨f, ⟨hf0, hfp⟩, hfu⟩ := recursion nat' (fun n m ↦ succ m) zero
+  simp at hfu
   apply existsUnique_of_exists_of_unique
   · use f
-    constructor
+    have hne0 (x:nat): x ≠ 0 → ∃ k, x = (k + 1:ℕ) := by
+      intro h; rw [ne_eq, ← nat_equiv_coe_of_coe' x, ] at h
+      rw [← SetTheory.Set.nat_coe_eq (n := 0), nat_equiv_inj] at h;
+      choose k hk using Nat.exists_eq_add_one_of_ne_zero h
+      use k; rw [← hk]; simp
+    constructor -- Bijective
     · constructor
-      · intro x1 x2 heq
+      · intro x1 x2 heq -- Injectivity
         induction' hx1: (x1:ℕ) with i ih generalizing x1 x2
-        · sorry
-        sorry
-      sorry
-    sorry
-  sorry
+        · rw [nat_coe_eq_zero hx1] at heq ⊢
+          symm; by_contra! h; choose k hk using hne0 x2 h
+          subst x2; rw [hf0, hfp] at heq
+          apply succ_ne _ heq.symm
+        apply nat_coe_eq at hx1; rw [hx1, hfp] at heq
+        have : x2 ≠ 0 := by rintro rfl; rw [hf0] at heq; apply succ_ne _ heq
+        choose k hk using hne0 x2 this; subst hk
+        rw [hfp, ← succ_inj] at heq;
+        rw [hx1]; congr; rw [← nat_equiv_inj];
+        apply ih heq (by simp)
+      apply ind; use 0 -- Surjectivity
+      intro y ih; choose x hx using ih
+      use ((x+1 : ℕ):nat)
+      rw [hfp]; simp [hx]
+    refine ⟨hf0, ?_⟩ -- Function behaves as intended
+    intro n m; simp[hfp]
+    refine ⟨by rintro rfl; rfl, (succ_inj _ _).2⟩
+  intro f1 f2 ⟨h1b, h10, h1i⟩ ⟨h2b, h20, h2i⟩; ext n
+  congr;
+  induction' hx1: (n:ℕ) with i ih generalizing n
+  · rw [nat_equiv.symm_apply_eq] at hx1; have hx1 : n = (0:nat) := by simp [hx1]; rfl
+    subst hx1; rw [h10, h20]
+  let r := nat_equiv i;
+  have hx1 : n = (nat_equiv.symm r + 1 : ℕ ) := by unfold r; simp [← hx1]
+  subst hx1 -- n = r + 1
+  rw [(h1i _ _).mp rfl,  (h2i _ _).mp rfl ] -- move +1 outside operation
+  rw [← succ_inj]; apply ih; unfold r; simp -- cancel +1 both sides
+
 
 
 end Chapter3
