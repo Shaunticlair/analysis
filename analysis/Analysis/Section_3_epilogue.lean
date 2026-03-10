@@ -18,7 +18,7 @@ universe u
 /-- A preliminary lemma about `PSet`: their natural numbers are ordered by membership. -/
 lemma PSet.ofNat_mem_ofNat_of_lt (m n : ℕ) : n < m → ofNat n ∈ ofNat m := by
   intro h
-  induction h with
+  induction h with -- Relies on 0 = ∅, 1 = {0}, 2 = {0,1}, 3 = {1,2,3}, etc.
   | refl => rw [ofNat]; apply mem_insert
   | step _ ih => rw [ofNat]; exact mem_insert_of_mem _ ih
 

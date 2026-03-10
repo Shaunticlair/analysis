@@ -585,11 +585,9 @@ instance Int.instLinearOrder : LinearOrder Int where
     · rw [h]; left; use 0; simp
   toDecidableLE := decidableRel
 
+
 /-- Exercise 4.1.3 -/
-theorem Int.neg_one_mul (a:Int) : -1 * a = -a := by
-  obtain ⟨ a1, a2, rfl ⟩ := eq_diff a
-  rw [ofNat_eq, neg_eq, neg_eq, mul_eq]
-  simp
+theorem Int.neg_one_mul (a:Int) : -1 * a = -a := (neg_eq_mul_neg_one _).symm
 
 /-- Exercise 4.1.8 -/
 theorem Int.no_induction : ∃ P: Int → Prop, (P 0 ∧ ∀ n, P n → P (n+1)) ∧ ¬ ∀ n, P n := by
@@ -1192,7 +1190,8 @@ we have nonzero denominator built-in, so we can avoid junk values.
 
 /-
 Making a formaldiv using a quotient is safe, unlike just making a
-formaldiv plainly.-/
+formaldiv plainly.
+-/
 lemma Rat.mk_eq_formalDiv (a b : ℤ) (hb : b ≠ 0) :
     (⟦{ numerator := a, denominator := b, nonzero := hb }⟧ : Rat) = a // b := by
   simp only [formalDiv]
@@ -1887,10 +1886,7 @@ theorem pow_nonneg' {G : Type*} [inst : MonoidWithZero G] [Preorder G]
   · rw [_root_.pow_zero]; norm_num
   · rw [_root_.pow_succ]; apply mul_nonneg ih hx
 
-/-
-theorem pow_nonneg{G : Type u_2} [MonoidWithZero G] [Preorder G] {a : G} [ZeroLEOneClass G] [PosMulMono G] (ha : 0 ≤ a) (n : ℕ) :
-0 ≤ a ^ n
--/
+
 
 /-
 Important, weird thing I learned: we need

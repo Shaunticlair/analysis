@@ -574,13 +574,16 @@ noncomputable abbrev SetTheory.Set.Fin.Fin_equiv_Fin (n:ℕ) : Fin n ≃ _root_.
 
 theorem SetTheory.Set.nonempty_of_inhabited' {X:Set} (x : X): X ≠ ∅ := nonempty_of_inhabited x.prop
 
+@[simp]
+lemma SetTheory.Set.fin_0_empty : Fin 0 = ∅ := by
+  rw [eq_empty_iff_forall_notMem]
+  grind [specification_axiom'']
+
 theorem SetTheory.Set.finite_choice {n:ℕ} {X: Fin n → Set} (h: ∀ i, X i ≠ ∅) : iProd X ≠ ∅ := by
   -- This proof broadly follows the one in the text
   -- (although it is more convenient to induct from 0 rather than 1)
   induction' n with n hn
-  · have : Fin 0 = ∅ := by
-      rw [eq_empty_iff_forall_notMem]
-      grind [specification_axiom''] -- (m : ℕ) < 0 is impossible
+  · have := fin_0_empty
     let f i : X i := absurd i.property (by simp)
     apply nonempty_of_inhabited' f -- Use empty function
   -- Set up to invoke inductive case
