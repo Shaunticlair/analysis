@@ -32,7 +32,7 @@ Users of the companion who have completed the exercises in this section are welc
 /--
   This definition needs to be made outside of the Section 4.3 namespace for technical reasons.
 -/
-def Rat.Close (ε : ℚ) (x y:ℚ) := |x-y| ≤ ε
+def Rat.Close (ε : ℚ) (x y:ℚ) := abs (x-y) ≤ ε
 
 
 namespace Section_4_3
@@ -62,7 +62,6 @@ theorem abs_of_zero : abs 0 = 0 := rfl
   (Not from textbook) This definition of absolute value agrees with the Mathlib one.
   Henceforth we use the Mathlib absolute value.
 -/
-@[simp]
 theorem abs_eq_abs (x: ℚ) : |x| = abs x  := by
   by_cases h : x > 0
   · rw [abs_of_pos h,_root_.abs_of_pos h]
@@ -82,8 +81,8 @@ theorem dist_eq (x y: ℚ) : dist x y = |x-y| := rfl
 /-- Proposition 4.3.3(a) / Exercise 4.3.1 -/
 theorem abs_nonneg (x: ℚ) : |x| ≥ 0 := by
   rcases le_total x 0 with (h | h)
-  · simp [abs_of_neg' h]; exact h
-  · simp [abs_of_pos' h]; exact h
+  · simp [abs_eq_abs,abs_of_neg' h]; exact h
+  · simp [abs_eq_abs,abs_of_pos' h]; exact h
 
 theorem abs_nonneg' (x: ℚ) : abs (x) ≥ 0 := by
   rw [← abs_eq_abs]; apply abs_nonneg
@@ -92,18 +91,18 @@ theorem abs_nonneg' (x: ℚ) : abs (x) ≥ 0 := by
 theorem abs_eq_zero_iff (x: ℚ) : |x| = 0 ↔ x = 0 := by
   constructor <;> intro h1
   · rcases le_total x 0 with (h | h)
-    · simp [abs_of_neg' h] at h1; exact h1
-    · simp [abs_of_pos' h] at h1; exact h1
+    · simp [abs_eq_abs,abs_of_neg' h] at h1; exact h1
+    · simp [abs_eq_abs,abs_of_pos' h] at h1; exact h1
   · simp [h1];
 
 /-- Proposition 4.3.3(c) / Exercise 4.3.1 -/
 theorem le_abs (x:ℚ) : -|x| ≤ x ∧ x ≤ |x| := by
   rcases le_total x 0 with (h | h)
-  · rw [abs_eq_abs, abs_of_neg' h]; ring_nf;
+  · rw [abs_eq_abs,abs_of_neg' h]; ring_nf;
     constructor; simp;
     -- Show the method once to demonstrate that I know what's going on
     · (have : x ≤ 0 := h); (have : 0 ≤ -x := by linarith); linarith
-  · simp [abs_of_pos' h]; exact h
+  · simp [abs_eq_abs,abs_of_pos' h]; exact h
 
 
 lemma negx_le_abs (x:ℚ) : -x ≤ |x| := by have:= le_abs x; linarith
@@ -122,13 +121,13 @@ theorem abs_add (x y:ℚ) : |x + y| ≤ |x| + |y| := by
 /-- Proposition 4.3.3(c) / Exercise 4.3.1 -/
 theorem abs_le_iff (x y:ℚ) : -y ≤ x ∧ x ≤ y ↔ |x| ≤ y := by
   rcases le_total x 0 with (hx | hx)
-  · simp [abs_of_neg' hx]; constructor <;> intro h
+  · simp [abs_eq_abs,abs_of_neg' hx]; constructor <;> intro h
     · linarith -- Flip the sign of h.1
     · constructor
       · linarith -- Flip signs on h
       · have : 0 ≤ -x := by linarith -- x ≤ 0 ≤ -x ≤ y
         linarith
-  · simp [abs_of_pos' hx]; intro h
+  · simp [abs_eq_abs,abs_of_pos' hx]; intro h
     have : 0 ≤ y := by linarith -- 0 ≤ x ≤ y
     have : -y ≤ 0 := by linarith -- Flip sign
     linarith -- -y ≤ 0 ≤ x
@@ -190,11 +189,11 @@ theorem close_iff (ε x y:ℚ): ε.Close x y ↔ |x - y| ≤ ε := by rfl
 
 /-- Examples 4.3.6 -/
 example : (0.1:ℚ).Close (0.99:ℚ) (1.01:ℚ) := by
-  rw [close_iff]; norm_num; rw [abs_of_pos (by norm_num)]; norm_num
+  rw [close_iff]; norm_num; rw [abs_eq_abs,abs_of_pos (by norm_num)]; norm_num
 
 /-- Examples 4.3.6 -/
 example : ¬ (0.01:ℚ).Close (0.99:ℚ) (1.01:ℚ) := by
-  rw [close_iff]; norm_num; rw [abs_of_pos (by norm_num)]; norm_num
+  rw [close_iff]; norm_num; rw [abs_eq_abs,abs_of_pos (by norm_num)]; norm_num
 
 /-- Examples 4.3.6 -/
 example (ε : ℚ) (hε : ε > 0) : ε.Close 2 2 := by
@@ -253,14 +252,14 @@ theorem close_between' {e x y z w:ℚ} (hxy: e.Close x y) (hxz: e.Close x z)
   rw [close_iff] at *;
   rcases le_total w x with (h | h)
   · have : 0 ≤ x - w := by linarith;
-    simp [abs_of_pos' this]
+    simp [abs_eq_abs,abs_of_pos' this]
     (have : y ≤ x := by linarith); have : 0 ≤ x - y := by linarith
-    simp [abs_of_pos' this] at hxy
+    simp [abs_eq_abs,abs_of_pos' this] at hxy
     linarith -- x ≤ y + e ≤ x + w + e  (being close to y is more restrictive)
   · have : x-w ≤ 0 := by linarith;
-    simp [abs_of_neg' this]
+    simp [abs_eq_abs,abs_of_neg' this]
     (have : x ≤ z := by linarith); have : (x-z) ≤  0 := by linarith
-    simp [abs_of_neg' this] at hxz
+    simp [abs_eq_abs,abs_of_neg' this] at hxz
     linarith -- x ≥ z - e ≥ x - w - e  (being close to z is more restrictive)
 
 /-- Proposition 4.3.7(f) / Exercise 4.3.2 -/

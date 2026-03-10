@@ -171,11 +171,22 @@ example : (0.1:ℚ).Steady ((fun n:ℕ ↦ (10:ℚ) ^ (-(n:ℤ)-1) ):Sequence) :
 /--
 Example 5.1.5: The sequence 0.1, 0.01, 0.001, ... is not 0.01-steady. Left as an exercise.
 -/
-example : ¬(0.01:ℚ).Steady ((fun n:ℕ ↦ (10:ℚ) ^ (-(n:ℤ)-1) ):Sequence) := by sorry
+example : ¬(0.01:ℚ).Steady ((fun n:ℕ ↦ (10:ℚ) ^ (-(n:ℤ)-1) ):Sequence) := by
+  rw [Rat.Steady.coe]; push_neg;
+  use 0, 1; unfold Rat.Close;
+  rw [abs_of_nonneg] <;> (simp; norm_num)
 
 /-- Example 5.1.5: The sequence 1, 2, 4, 8, ... is not ε-steady for any ε. Left as an exercise.
 -/
-example (ε:ℚ) : ¬ ε.Steady ((fun n:ℕ ↦ (2 ^ (n+1):ℚ) ):Sequence) := by sorry
+example (ε:ℚ) : ¬ ε.Steady ((fun n:ℕ ↦ (2 ^ (n+1):ℚ) ):Sequence) := by
+  rw [Rat.Steady.coe]; push_neg
+  choose n hn using exists_nat_gt ε
+  use n+1, n; unfold Rat.Close; push_neg; rw [abs_of_nonneg]
+  · calc
+      ε < n+1 := by linarith
+      _ < 2 ^ (n+1) := by norm_cast; apply Nat.lt_two_pow_self
+      _ = _ := by ring
+  · simp; gcongr <;> norm_num
 
 /-- Example 5.1.5:The sequence 2, 2, 2, ... is ε-steady for any ε > 0.
 -/
@@ -216,6 +227,8 @@ lemma Rat.eventuallySteady_def (ε: ℚ) (a: Chapter5.Sequence) :
 
 namespace Chapter5
 
+--def Rat.Close (ε : ℚ) (x y:ℚ) := |x-y| ≤ ε
+
 /--
 Example 5.1.7: The sequence 1, 1/2, 1/3, ... is not 0.1-steady
 -/
@@ -254,7 +267,12 @@ Example 5.1.7
 The sequence 10, 0, 0, ... is eventually ε-steady for every ε > 0. Left as an exercise.
 -/
 lemma Sequence.ex_5_1_7_d {ε:ℚ} (hε:ε>0) :
-    ε.EventuallySteady ((fun n:ℕ ↦ if n=0 then (10:ℚ) else (0:ℚ) ):Sequence) := by sorry
+    ε.EventuallySteady ((fun n:ℕ ↦ if n=0 then (10:ℚ) else (0:ℚ) ):Sequence) := by
+  use 1; simp; rw [Rat.Steady]; intro n hn m hm; simp at hn hm
+  simp [hn, hm]; rw [Rat.Close]
+  split_ifs <;> try omega
+  simp_all; positivity
+
 
 abbrev Sequence.IsCauchy (a:Sequence) : Prop := ∀ ε > (0:ℚ), ε.EventuallySteady a
 
@@ -296,17 +314,21 @@ lemma Sequence.IsCauchy.mk {n₀:ℤ} (a: {n // n ≥ n₀} → ℚ) :
 
 noncomputable def Sequence.sqrt_two : Sequence := (fun n:ℕ ↦ ((⌊ (Real.sqrt 2)*10^n ⌋ / 10^n):ℚ))
 
-/--
+/-
   Example 5.1.10. (This requires extensive familiarity with Mathlib's API for the real numbers.)
--/
-theorem Sequence.ex_5_1_10_a : (1:ℚ).Steady sqrt_two := by sorry
 
-/--
-  Example 5.1.10. (This requires extensive familiarity with Mathlib's API for the real numbers.)
--/
-theorem Sequence.ex_5_1_10_b : (0.1:ℚ).Steady (sqrt_two.from 1) := by sorry
+Shaunticlair note: I'm absolutely not doing that.
 
-theorem Sequence.ex_5_1_10_c : (0.1:ℚ).EventuallySteady sqrt_two := by sorry
+  theorem Sequence.ex_5_1_10_a : (1:ℚ).Steady sqrt_two := by sorry
+
+  theorem Sequence.ex_5_1_10_b : (0.1:ℚ).Steady (sqrt_two.from 1) := by sorry
+
+  theorem Sequence.ex_5_1_10_c : (0.1:ℚ).EventuallySteady sqrt_two := by sorry
+-/
+
+
+
+
 
 /-- Proposition 5.1.11. The harmonic sequence, defined as a₁ = 1, a₂ = 1/2, ... is a Cauchy sequence. -/
 theorem Sequence.IsCauchy.harmonic : (mk' 1 (fun n ↦ (1:ℚ)/n)).IsCauchy := by
@@ -355,6 +377,15 @@ abbrev Sequence.BoundedBy (a:Sequence) (M:ℚ) : Prop := ∀ n, |a n| ≤ M
 /-- Definition 5.1.12 (bounded sequences) -/
 lemma Sequence.boundedBy_def (a:Sequence) (M:ℚ) : a.BoundedBy M ↔ ∀ n, |a n| ≤ M := by rfl
 
+lemma Sequence.boundedBy_def' (a:Sequence) (M:ℚ) : a.BoundedBy M ↔ ∀ n ≥ a.n₀, |a n| ≤ M := by
+  constructor <;> intro h n
+  · intro hn; apply h
+  · by_cases hn : n ≥ a.n₀
+    · exact h n hn
+    · specialize h (a.n₀ ) (by linarith)
+      rw [a.vanish n (by linarith)]; apply le_trans _ h
+      simp
+
 abbrev Sequence.IsBounded (a:Sequence) : Prop := ∃ M ≥ 0, a.BoundedBy M
 
 /-- Definition 5.1.12 (bounded sequences) -/
@@ -363,8 +394,23 @@ lemma Sequence.isBounded_def (a:Sequence) : a.IsBounded ↔ ∃ M ≥ 0, a.Bound
 /-- Example 5.1.13 -/
 example : BoundedBy ![1,-2,3,-4] 4 := by intro i; fin_cases i <;> norm_num
 
+
+lemma Sequence.isBounded_def.coe (a:ℕ → ℚ) :
+    (a:Sequence).IsBounded ↔ ∃ M ≥ 0, ∀ n, |a n| ≤ M := by
+  constructor <;> intro h <;> choose M hM ha using h
+  <;> refine ⟨ M, hM, ?_ ⟩ <;> intro n;
+  · exact ha n
+  · by_cases hn : n ≥ 0 <;> simp [hn];
+    · lift n to ℕ using hn; exact ha n
+    · omega
+
 /-- Example 5.1.13 -/
-example : ¬((fun n:ℕ ↦ (-1)^n * (n+1:ℚ)):Sequence).IsBounded := by sorry
+example : ¬((fun n:ℕ ↦ (-1)^n * (n+1:ℚ)):Sequence).IsBounded := by
+  unfold Sequence.IsBounded Sequence.BoundedBy
+  push_neg; intro M hM;
+  choose N hN using exists_nat_gt M; use N;
+  simp [abs_mul, abs_pow]
+  rw [abs_of_pos] <;> linarith
 
 /-- Example 5.1.13 -/
 example : ((fun n:ℕ ↦ (-1:ℚ)^n):Sequence).IsBounded := by
@@ -394,21 +440,77 @@ lemma IsBounded.finite {n:ℕ} (a: Fin n → ℚ) : ∃ M ≥ 0,  BoundedBy a M 
   have h2 : |a (Fin.ofNat _ n)| ≤ M + |a (Fin.ofNat _ n)| := by simp [hpos]
   refine ⟨ M + |a (Fin.ofNat _ n)|, by positivity, ?_ ⟩
   intro m; obtain ⟨ j, rfl ⟩ | rfl := Fin.eq_castSucc_or_eq_last m
-  . grind
+  · grind
   convert h2; simp
 
 /-- Lemma 5.1.15 (Cauchy sequences are bounded) / Exercise 5.1.1 -/
 lemma Sequence.isBounded_of_isCauchy {a:Sequence} (h: a.IsCauchy) : a.IsBounded := by
-  sorry
+  -- Split sequence into finite region and 1-steady region
+  choose N hN h using h 1 (by norm_num)
+  -- Length of the finite region + 1
+  let finN:= N - a.n₀ + 1
+  -- Shift the finite region to start from 0
+  let b : Fin (finN.toNat) → ℚ := fun m ↦ a (m + a.n₀)
+  -- Finite bounded by M
+  obtain ⟨ M, hMpos, hM ⟩ := IsBounded.finite b
+  -- Bound of 1-steady region will be |a N| + 1; combine bounds
+  have h1 : Chapter5.BoundedBy b (M + |(a N)|+1) := fun m ↦ (hM m).trans (by simp [add_assoc]; positivity)
+  -- Because a n has to be 1-close to a N, |a n| can only be +/- 1 |a N|
+  have h2' : ∀ n ≥ N, |a n| ≤ |a N|+1 := by
+    intro n hn;
+    specialize h n _ N _ <;> try simp [hn] <;> try linarith
+    simp_all; rw [Rat.Close] at h
+    calc -- Traveling 0 → a N → a n , second step can only add at most 1
+      _ =  |(a n - a N) + a N| := by ring_nf
+      _ ≤  |a n - a N| + |a N| := abs_add _ _
+      _ ≤ |a N| + 1 := by linarith
+  -- Combine bounds
+  have h2 : ∀ n ≥ N, |a n| ≤ M + |a N| + 1 := fun n hn ↦
+    (h2' n hn).trans (by simp; positivity)
+  -- Use combined bound
+  refine ⟨ M + |a N| + 1, by positivity, ?_ ⟩
+  rw [Sequence.boundedBy_def']
+  intro n hn0
+  -- Split cases: finite region vs 1-steady region
+  by_cases hn : n < N
+  · specialize h1 ⟨ (n - a.n₀).toNat, by omega ⟩ -- Shifted index
+    convert h1 -- To use finite proof, we just need to shift index back
+    simp [hn0]
+  · push_neg at hn; exact h2 n hn -- No work necessary
 
 /-- Exercise 5.1.2 -/
 theorem Sequence.isBounded_add {a b:ℕ → ℚ} (ha: (a:Sequence).IsBounded) (hb: (b:Sequence).IsBounded):
-    (a + b:Sequence).IsBounded := by sorry
+    (a + b:Sequence).IsBounded := by
+  rw [Sequence.isBounded_def.coe] at *
+  choose M hM ha using ha
+  choose N hN hb using hb
+  refine ⟨ M + N, by positivity, ?_ ⟩
+  intro n; specialize ha n; specialize hb n
+  simp; have := abs_add (a n) (b n)
+  linarith
+
+lemma Sequence.isBounded_neg {a:ℕ → ℚ} (ha: (a:Sequence).IsBounded) :
+    ((-a : ℕ → ℚ ):Sequence).IsBounded := by
+  rw [Sequence.isBounded_def.coe] at *
+  choose M hM ha using ha
+  refine ⟨ M, hM, ?_ ⟩
+  intro n; specialize ha n
+  simp; exact ha
 
 theorem Sequence.isBounded_sub {a b:ℕ → ℚ} (ha: (a:Sequence).IsBounded) (hb: (b:Sequence).IsBounded):
-    (a - b:Sequence).IsBounded := by sorry
+    (a - b:Sequence).IsBounded := by
+  rw [show a - b = a + (-b) by ring]
+  apply isBounded_neg at hb
+  exact isBounded_add ha hb
 
 theorem Sequence.isBounded_mul {a b:ℕ → ℚ} (ha: (a:Sequence).IsBounded) (hb: (b:Sequence).IsBounded):
-    (a * b:Sequence).IsBounded := by sorry
+    (a * b:Sequence).IsBounded := by
+  rw [Sequence.isBounded_def.coe] at *
+  choose M hM ha using ha
+  choose N hN hb using hb
+  refine ⟨ M * N, by positivity, ?_ ⟩
+  intro n; specialize ha n; specialize hb n
+  simp; rw [abs_mul (a n) (b n)]
+  apply mul_le_mul ha hb <;> positivity
 
 end Chapter5
