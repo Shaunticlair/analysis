@@ -163,18 +163,24 @@ instance Chapter5.Sequence.inst_coe_sequence : Coe Chapter5.Sequence Sequence wh
 @[simp]
 theorem Chapter5.coe_sequence_eval (a: Chapter5.Sequence) (n:ℤ) : (a:Sequence) n = (a n:ℝ) := rfl
 
+#check Chapter5.Real.ratCast_sub
+
 theorem Sequence.is_steady_of_rat (ε:ℚ) (a: Chapter5.Sequence) :
-    ε.Steady a ↔ (ε:ℝ).Steady (a:Sequence) := by sorry
+  ε.Steady a ↔ (ε:ℝ).Steady (a:Sequence) := by
+  peel with n hn m hm; simp [Rat.Close, dist];
+  rw [← Rat.cast_sub, ← Rat.cast_abs, Rat.cast_le]
 
 theorem Sequence.is_eventuallySteady_of_rat (ε:ℚ) (a: Chapter5.Sequence) :
-    ε.EventuallySteady a ↔ (ε:ℝ).EventuallySteady (a:Sequence) := by sorry
+    ε.EventuallySteady a ↔ (ε:ℝ).EventuallySteady (a:Sequence) := by
+  peel with q hq; rw [is_steady_of_rat]; grind
+
 
 /-- Proposition 6.1.4 -/
 theorem Sequence.isCauchy_of_rat (a: Chapter5.Sequence) : a.IsCauchy ↔ (a:Sequence).IsCauchy := by
   -- This proof is written to follow the structure of the original text.
   constructor
   swap
-  . intro h; rw [isCauchy_def] at h
+  · intro h; rw [isCauchy_def] at h
     rw [Chapter5.Sequence.isCauchy_def]
     intro ε hε
     specialize h ε (by positivity)
@@ -183,7 +189,7 @@ theorem Sequence.isCauchy_of_rat (a: Chapter5.Sequence) : a.IsCauchy ↔ (a:Sequ
   rw [Chapter5.Sequence.isCauchy_def] at h
   rw [isCauchy_def]
   intro ε hε
-  choose ε' hε' hlt using exists_pos_rat_lt hε
+  choose ε' hε' hlt using exists_pos_rat_lt hε -- Choose a smaller ε' that is rational
   specialize h ε' hε'
   rw [is_eventuallySteady_of_rat] at h
   exact h.mono (le_of_lt hlt)
@@ -228,21 +234,20 @@ theorem Sequence.tendsTo_def (a:Sequence) (L:ℝ) :
 
 /-- Exercise 6.1.2 -/
 theorem Sequence.tendsTo_iff (a:Sequence) (L:ℝ) :
-  a.TendsTo L ↔ ∀ ε > 0, ∃ N, ∀ n ≥ N, |a n - L| ≤ ε := by sorry
+  a.TendsTo L ↔ ∀ ε > 0, ∃ N, ∀ n ≥ N, |a n - L| ≤ ε := by
+    unfold TendsTo Real.EventuallyClose Real.CloseSeq Real.Close;
+    peel with e he;
+    constructor <;> rintro ⟨N, h⟩ <;> use max N a.m
+    · intro n hn; have ⟨h1, h2⟩ := h; specialize h2 n (by grind)
+      rw [Real.dist_eq] at h2; grind
+    refine ⟨by simp, ?_⟩; intro n hn
+    rw [Real.dist_eq]; grind
 
 noncomputable def seq_6_1_6 : Sequence := (fun (n:ℕ) ↦ 1-(10:ℝ)^(-(n:ℤ)-1):Sequence)
 
-/-- Examples 6.1.6 -/
-example : (0.1:ℝ).CloseSeq seq_6_1_6 1 := by
-  rw [seq_6_1_6, Real.CloseSeq.coe]
-  intro n
-  rw [Real.dist_eq, abs_sub_comm, abs_of_nonneg (by
-    rw [sub_nonneg]
-    rw (occs := .pos [2]) [show (1:ℝ) = 1 - 0 by norm_num]
-    gcongr
-    positivity
-  ), sub_sub_cancel, show (0.1:ℝ) = (10:ℝ)^(-1:ℤ) by norm_num]
-  gcongr <;> grind
+
+
+
 
 
 /-- Examples 6.1.6 -/
@@ -250,10 +255,52 @@ example : ¬ (0.01:ℝ).CloseSeq seq_6_1_6 1 := by
   intro h; specialize h 0 (by positivity); simp [seq_6_1_6] at h; norm_num at h
 
 /-- Examples 6.1.6 -/
-example : (0.01:ℝ).EventuallyClose seq_6_1_6 1 := by sorry
+example : (0.01:ℝ).EventuallyClose seq_6_1_6 1 := by
+  rw [Real.eventuallyClose_def, seq_6_1_6]; use 1; simp [Real.CloseSeq]
+  intro n hn; simp [hn, (by linarith: 0 ≤ n)]
+  rw [show (1e-2:ℝ) = 10^(-2:ℤ) by norm_num]
+  gcongr <;> grind
+
+#check exists_nat_gt
+
 
 /-- Examples 6.1.6 -/
-example : seq_6_1_6.TendsTo 1 := by sorry
+example : seq_6_1_6.TendsTo 1 := by
+  intro e he; choose N hN using exists_nat_gt (1/e)
+  use N+1; simp [seq_6_1_6, Real.CloseSeq]; refine ⟨by linarith, ?_⟩
+  intro n hn0 hnp; simp [hn0, hnp];
+  replace hnp : (N:ℝ) + 1 ≤ n := by exact_mod_cast hnp
+  lift n to ℕ using (by linarith)
+  have : (n+1:ℝ) ≤ (10:ℝ)^(n+1:ℤ) := by exact_mod_cast Chapter5.ten_pow_geq (n+1)
+  rw [show -(n:ℤ)-1 = -(n+1) by ring, ← inv_inv (a := e)];
+  nth_rw 2 [← one_div]; rw [zpow_neg]; gcongr;
+  simp at hnp; linarith
+
+
+
+
+/-
+e : ℝ
+N : ℕ
+n : ℕ
+he : e > 0
+hN : 1 / e < (N : ℝ)
+this : (10:ℕ) ^ (n + 1) ≥ n + 1
+hnp : (N:ℤ) + 1 ≤ (n:ℤ)
+⊢ 1 / e ≤ 10 ^ ((n:ℤ) + 1)
+-/
+
+
+/-
+e : ℝ
+N : ℕ
+n : ℕ
+he : e > 0
+hN : 1 / e < (N : ℝ)
+this : (10:ℕ) ^ ((n:ℤ) + 1) ≥ n + 1
+hnp : (N:ℤ) + 1 ≤ (n:ℤ)
+⊢ 1 / e ≤ 10 ^ ((n:ℤ) + 1)
+-/
 
 /-- Proposition 6.1.7 (Uniqueness of limits) -/
 theorem Sequence.tendsTo_unique (a:Sequence) {L L':ℝ} (h:L ≠ L') :
@@ -337,20 +384,61 @@ theorem Sequence.lim_harmonic :
 
 /-- Proposition 6.1.12 / Exercise 6.1.5 -/
 theorem Sequence.IsCauchy.convergent {a:Sequence} (h:a.Convergent) : a.IsCauchy := by
-  sorry
+  choose L hL using h; intro e he; specialize hL (e/3) (by positivity); choose N hN hL using hL
+  refine ⟨N, hN, ?_⟩; intro n hn m hm; have hn:= hL n hn; have hm:= hL m hm
+  rw [Real.close_def] at *; apply le_trans (dist_triangle _ L _)
+  rw [dist_comm] at hm; linarith
+
 
 /-- Example 6.1.13 -/
-example : ¬ (0.1:ℝ).EventuallySteady ((fun n ↦ (-1:ℝ)^n):Sequence) := by sorry
+example : ¬ (0.1:ℝ).EventuallySteady ((fun n ↦ (-1:ℝ)^n):Sequence) := by
+  rw [Real.eventuallySteady_def]; push_neg; --rw [Real.steady_def]; push_neg
+  intro N hN; rw [Real.steady_def]; push_neg
+  refine ⟨N, by simp [hN], N+1, by simp [hN], ?_⟩
+  rw [Real.close_def]; push_neg;
+  simp at hN; lift N to ℕ using hN; simp [show 0 ≤ (N:ℤ)+1 by linarith]
+  rw [pow_succ]; simp [dist];
+  by_cases hN : Even N
+  · simp [hN]; norm_num
+  simp at hN; simp [hN]; norm_num
 
 /-- Example 6.1.13 -/
-example : ¬ ((fun n ↦ (-1:ℝ)^n):Sequence).IsCauchy := by sorry
+lemma ex6_1_13 : ¬ ((fun n ↦ (-1:ℝ)^n):Sequence).IsCauchy := by
+  rw [Sequence.isCauchy_def]; push_neg; use 0.5; refine ⟨by norm_num, ?_⟩
+  rw [Real.eventuallySteady_def]; push_neg; intro N hN; rw [Real.steady_def]; push_neg
+  use N; simp at hN; simp [hN, dist]; use N+1; simp [show 0 ≤ (N:ℤ)+1 by linarith]
+  lift N to ℕ using hN
+  by_cases h : Even N
+  · simp [h]; norm_num
+  simp at h; simp [h]; norm_num
 
 /-- Example 6.1.13 -/
-example : ¬ ((fun n ↦ (-1:ℝ)^n):Sequence).Convergent := by sorry
+example : ¬ ((fun n ↦ (-1:ℝ)^n):Sequence).Convergent := by
+  intro h; apply ex6_1_13; exact Sequence.IsCauchy.convergent h
+
+/-
+Exercise 6.1.6 Prove Proposition 6.1.15, using the following outline. Let (an)∞
+n=1 be a Cauchy
+sequence of rationals, and write L := LIMn→∞ an. We have to show that (an)∞
+n=1 converges to L.
+Let ε > 0. Assume for sake of contradiction that sequence an is not eventually ε-close to L. Use this,
+and the fact that (an)∞
+n=1 is Cauchy, to show that there is an N ≥ m such that either an > L + ε/2
+for all n ≥ N, or an < L − ε/2 for all n ≥ N. Then use Exercise 5.4.8.
+-/
+
+#check Chapter5.Real.LIM_of_le
+
+/-
+This involves wrestling with ℝ machinery and I don't wanna do that right now.
+-/
 
 /-- Proposition 6.1.15 / Exercise 6.1.6 (Formal limits are genuine limits)-/
 theorem Sequence.lim_eq_LIM {a:ℕ → ℚ} (h: (a:Chapter5.Sequence).IsCauchy) :
-    ((a:Chapter5.Sequence):Sequence).TendsTo (Chapter5.Real.equivR (Chapter5.LIM a)) := by sorry
+    ((a:Chapter5.Sequence):Sequence).TendsTo (Chapter5.Real.equivR (Chapter5.LIM a)) := by
+  rw [Sequence.tendsTo_iff]; intro e he
+  have ha := h ; rw [Chapter5.Sequence.IsCauchy.coe] at h
+  sorry
 
 /-- Definition 6.1.16 -/
 abbrev Sequence.BoundedBy (a:Sequence) (M:ℝ) : Prop :=
@@ -367,18 +455,49 @@ abbrev Sequence.IsBounded (a:Sequence) : Prop := ∃ M ≥ 0, a.BoundedBy M
 lemma Sequence.isBounded_def (a:Sequence) :
   a.IsBounded ↔ ∃ M ≥ 0, a.BoundedBy M := by rfl
 
+lemma Sequence.isBounded_finite' {a : Sequence} (k : ℕ) : ∃ M≥0, ∀ i < a.m + k, |a i| ≤ M := by
+  induction' k with k ih
+  · use 0; simp; intro i hi; rw [a.vanish i hi];
+  choose M hM using ih; use max M (|a (a.m + k)|); simp [hM.1]
+  intro i hi; simp [← add_assoc] at hi;
+  rw [Int.lt_iff_add_one_le] at hi; simp at hi
+  rcases Int.lt_or_eq_of_le hi with h | rfl
+  · simp [hM.2 i h]
+  simp
+
+lemma Sequence.isBounded_finite (a : Sequence) (n : ℤ) : ∃ M ≥ 0, ∀ i < n, |a i| ≤ M := by
+  by_cases h : n < a.m
+  · use 0; simp; intro i hi; have := hi.trans h
+    rw [a.vanish i this];
+  convert isBounded_finite' ((n - a.m).toNat); simp_all
+
 theorem Sequence.bounded_of_cauchy {a:Sequence} (h: a.IsCauchy) : a.IsBounded := by
-  sorry
+  -- Split sequence into finite region and 1-steady region
+  choose N hN h using h 1 (by norm_num)
+  choose B hB0 hB using isBounded_finite a N
+  use B + |a N| + 1; refine ⟨by positivity, ?_⟩
+  intro i
+  by_cases hi : i < N
+  · specialize hB i hi; linarith [abs_nonneg (a.seq N)]
+  simp at hi
+  specialize h i (by simp; constructor <;> linarith) N (by simp [hN])
+  rw [Real.close_def, Real.dist_eq, from_eval _ hi, from_eval _ (by rfl)] at h;
+  rw [show a.seq i = a.seq N + (a.seq i - a.seq N) by ring]; apply le_trans (abs_add _ _ )
+  linarith
 
 /-- Corollary 6.1.17 -/
 theorem Sequence.bounded_of_convergent {a:Sequence} (h: a.Convergent) : a.IsBounded := by
-  sorry
+  apply bounded_of_cauchy; apply Sequence.IsCauchy.convergent h
 
 /-- Example 6.1.18 -/
-example : ¬ ((fun (n:ℕ) ↦ (n+1:ℝ)):Sequence).IsBounded := by sorry
+lemma ex_6_1_18 : ¬ ((fun (n:ℕ) ↦ (n+1:ℝ)):Sequence).IsBounded := by
+  rw [Sequence.isBounded_def]; push_neg; intro M hM; choose n hn using (exists_nat_gt M)
+  rw [Sequence.boundedBy_def]; push_neg; use n
+  simp; norm_cast; simp; linarith
 
 /-- Example 6.1.18 -/
-example : ¬ ((fun (n:ℕ) ↦ (n+1:ℝ)):Sequence).Convergent := by sorry
+example : ¬ ((fun (n:ℕ) ↦ (n+1:ℝ)):Sequence).Convergent := by
+  intro h; apply ex_6_1_18; apply Sequence.bounded_of_convergent h
 
 instance Sequence.inst_add : Add Sequence where
   add a b := {
@@ -398,11 +517,20 @@ theorem Sequence.add_coe (a b: ℕ → ℝ) : (a:Sequence) + (b:Sequence) = (fun
     in applications. -/
 theorem Sequence.tendsTo_add {a b:Sequence} {L M:ℝ} (ha: a.TendsTo L) (hb: b.TendsTo M) :
   (a+b).TendsTo (L+M) := by
-  sorry
+  rw [tendsTo_iff] at *;
+  intro e he; specialize ha (e/2) (by positivity); specialize hb (e/2) (by positivity);
+  choose A ha using ha; choose B hb using hb; use max A B; intro n hn
+  specialize ha n (by grind); specialize hb n (by grind)
+  simp; have := abs_add (a.seq n - L) (b.seq n - M)
+  replace := this.trans (add_le_add ha hb)
+  convert this using 1 <;> ring_nf
+
 
 theorem Sequence.lim_add {a b:Sequence} (ha: a.Convergent) (hb: b.Convergent) :
   (a + b).Convergent ∧ lim (a + b) = lim a + lim b := by
-  sorry
+  choose L ha using ha; choose M hb using hb
+  rw [← Sequence.lim_eq]; convert tendsTo_add ha hb
+  <;> rw [lim_eq] at ha hb <;> simp_all
 
 instance Sequence.inst_mul : Mul Sequence where
   mul a b := {
@@ -418,10 +546,59 @@ theorem Sequence.mul_coe (a b: ℕ → ℝ) : (a:Sequence) * (b:Sequence) = (fun
   ext n; rfl
   by_cases h:n ≥ 0 <;> simp [h]
 
+/-
+Duplicated from 4.3
+-/
+theorem Real.close_symm (ε x y:ℝ) : ε.Close x y ↔ ε.Close y x := by
+  rw [Real.close_def, Real.close_def]; rw [dist_comm]
+
+theorem Real.close_mul_mul {ε δ x y z w:ℝ} (hxy: ε.Close x y) (hzw: δ.Close z w) :
+    (ε*|z|+δ*|x|+ε*δ).Close (x * z) (y * w) := by
+  have hε : ε ≥ 0 := le_trans (abs_nonneg _) hxy
+  set a := y-x
+  have ha : y = x + a := by grind
+  have haε: |a| ≤ ε := by rwa [close_symm, Real.close_def] at hxy
+  set b := w-z
+  have hb : w = z + b := by grind
+  have hbδ: |b| ≤ δ := by rwa [close_symm, Real.close_def] at hzw
+  have : y*w = x * z + a * z + x * b + a * b := by grind
+  rw [close_symm, Real.close_def]
+  calc
+    _ = |a * z + b * x + a * b| := by rw [Real.dist_eq]; grind
+    _ ≤ |a * z + b * x| + |a * b| := abs_add _ _
+    _ ≤ |a * z| + |b * x| + |a * b| := by simp; grind [abs_add]
+    _ = |a| * |z| + |b| * |x| + |a| * |b| := by grind [abs_mul]
+    _ ≤ _ := by gcongr
+
+theorem Real.close_mul_mul' {ε δ x y z w:ℝ} (hxy: ε.Close x y) (hzw: δ.Close z w) :
+    (ε*|z|+δ*|y|).Close (x * z) (y * w) := by
+    -- Fun fact, I actually found this proof before I found the one above.
+    rw [Real.close_def, Real.dist_eq] at *;
+
+    have h:= abs_add (x*z - y*z) (y*z - y*w);
+    have h3: x*z - y*z = (x - y) * z := by ring;
+    nth_rw 2 [h3] at h; rw [abs_mul] at h
+    have h4: y*z - y*w = y * (z - w) := by ring
+    nth_rw 2 [h4] at h; rw [abs_mul] at h; nth_rw 6 [mul_comm] at h
+    calc
+      _ = |x * z - y * z + (y * z - y * w)| := by ring_nf
+      _ ≤ |x - y| * |z| + |z - w| * |y|:= h
+    gcongr
+
 /-- Theorem 6.1.19(b) (limit laws).  The `tendsTo` version is more usable than the `lim` version
     in applications. -/
 theorem Sequence.tendsTo_mul {a b:Sequence} {L M:ℝ} (ha: a.TendsTo L) (hb: b.TendsTo M) :
     (a * b).TendsTo (L * M) := by
+  rw [tendsTo_iff] at *;
+  intro e he; specialize ha (e/(2*(|M|+1))) (by sorry);
+  specialize hb (e/(2*(|L|+1))) (by sorry);
+  choose A ha using ha; choose B hb using hb; use max A B; intro n hn
+  specialize ha n (by grind); specialize hb n (by grind)
+  simp; have := abs_mul (a.seq n - L) (b.seq n - M)
+  replace := this ▸ (mul_le_mul ha hb (by positivity) (by positivity))
+  convert le_trans ?_ this
+  rw [Real.mul_self_sqrt (by positivity)]
+
   sorry
 
 theorem Sequence.lim_mul {a b:Sequence} (ha: a.Convergent) (hb: b.Convergent) :

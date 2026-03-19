@@ -219,6 +219,7 @@ theorem Rat.not_exist_sqrt_two : ¬ ∃ x:ℚ, x^2 = 2 := by
     --grind
   exact Nat.no_infinite_descent ⟨ a, hlt ⟩
 
+#check Rat.not_exist_sqrt_two
 
 /-- Proposition 4.4.5 -/
 theorem Rat.exist_approx_sqrt_two {ε:ℚ} (hε:ε>0) : ∃ x ≥ (0:ℚ), x^2 < 2 ∧ 2 < (x+ε)^2 := by

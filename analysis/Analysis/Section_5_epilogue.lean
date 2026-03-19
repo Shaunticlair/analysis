@@ -26,7 +26,7 @@ Users of the companion who have completed the exercises in this section are welc
 
 namespace Chapter5
 
-
+@[ext]
 structure DedekindCut where
   E : Set ℚ
   nonempty : E.Nonempty
@@ -39,13 +39,30 @@ theorem isLowerSet_iff (E: Set ℚ) : IsLowerSet E ↔ ∀ q r, r < q → q ∈ 
 
 abbrev Real.toSet_Rat (x:Real) : Set ℚ := { q | (q:Real) < x }
 
-lemma Real.toSet_Rat_nonempty (x:Real) : x.toSet_Rat.Nonempty := by sorry
+lemma Real.toSet_Rat_nonempty (x:Real) : x.toSet_Rat.Nonempty := by
+  choose n hn1 hn2 using floor_exist x;
+  use (n-1); simp [toSet_Rat]; linarith
 
-lemma Real.toSet_Rat_bounded (x:Real) : BddAbove x.toSet_Rat := by sorry
+#check Real.lt_of_coe
 
-lemma Real.toSet_Rat_lower (x:Real) : IsLowerSet x.toSet_Rat := by sorry
+#check Real.ratCast_inj
+lemma Real.le_of_coe (q q':ℚ): (q:Real) ≤ (q':Real) ↔  q ≤ q' := by
+  simp only [le_iff,← lt_of_coe, ratCast_inj];
+  symm; convert le_iff_lt_or_eq
 
-lemma Real.toSet_Rat_nomax {x:Real} : ∀ q ∈ x.toSet_Rat, ∃ r ∈ x.toSet_Rat, r > q := by sorry
+lemma Real.toSet_Rat_bounded (x:Real) : BddAbove x.toSet_Rat := by
+  choose n hn1 using exists_nat_gt x; use (n:ℚ)
+  simp [mem_upperBounds, toSet_Rat]; intros; rw [← le_of_coe];
+  (conv => rhs; simp); linarith
+
+lemma Real.toSet_Rat_lower (x:Real) : IsLowerSet x.toSet_Rat := by
+  intro q r hrq hq; simp [toSet_Rat] at *; rw [← le_of_coe] at hrq; linarith
+
+#check Real.rat_between
+
+lemma Real.toSet_Rat_nomax {x:Real} : ∀ q ∈ x.toSet_Rat, ∃ r ∈ x.toSet_Rat, r > q := by
+  intro q hq; simp [toSet_Rat] at *; choose x hx using rat_between hq; use x;
+  rw [← lt_of_coe] at hx; refine ⟨by linarith, by linarith⟩
 
 abbrev Real.toCut (x:Real) : DedekindCut :=
  {
@@ -56,11 +73,15 @@ abbrev Real.toCut (x:Real) : DedekindCut :=
    nomax := x.toSet_Rat_nomax
  }
 
+-- Cast each rational in the cut to a Real, set of reals
 abbrev DedekindCut.toSet_Real (c: DedekindCut) : Set Real := (fun (q:ℚ) ↦ (q:Real)) '' c.E
 
-lemma DedekindCut.toSet_Real_nonempty (c: DedekindCut) : c.toSet_Real.Nonempty := by sorry
+-- Now we can get sup over them
+lemma DedekindCut.toSet_Real_nonempty (c: DedekindCut) : c.toSet_Real.Nonempty := by
+  choose x hx using c.nonempty; use x; simpa [toSet_Real] using hx
 
-lemma DedekindCut.toSet_Real_bounded (c: DedekindCut) : BddAbove c.toSet_Real := by sorry
+lemma DedekindCut.toSet_Real_bounded (c: DedekindCut) : BddAbove c.toSet_Real := by
+  choose x hx using c.bounded; use x; simp [upperBounds, toSet_Real] at *; convert hx
 
 noncomputable abbrev DedekindCut.toReal (c: DedekindCut) : Real := sSup c.toSet_Real
 
@@ -71,17 +92,40 @@ noncomputable abbrev Real.equivCut : Real ≃ DedekindCut where
   toFun := toCut
   invFun := DedekindCut.toReal
   left_inv x := by
-    sorry
+    simp [toSet_Rat, DedekindCut.toReal, DedekindCut.toSet_Real];
+    refine csSup_eq_of_is_forall_le_of_forall_le_imp_ge ?_ ?_ ?_
+    · choose z hz using rat_between (by simp : x-1 < x)
+      use z; simp [hz.2]
+    · intro z hz; simp at hz; obtain ⟨h1, h2, rfl⟩ := hz; apply le_of_lt h2
+    intro u hu; simp at hu; contrapose! hu; choose z hz using rat_between hu
+    use z; symm; exact hz
   right_inv c := by
-    sorry
+    ext q; have ⟨hub, hleast⟩ := (isLUB_def _ _).mp c.toReal_isLUB
+    simp [DedekindCut.toReal, DedekindCut.toSet_Real, upperBound_def] at *
+    set cE' := ((fun q:ℚ ↦ (q:Real)) '' c.E)
+
+    constructor <;> intro h
+    · suffices ∃ z , z ∈ c.E ∧ z > q by
+        choose z hz1 hz2 using this; apply c.lower (by exact_mod_cast le_of_lt hz2) hz1
+      contrapose! hleast; use q;
+      refine ⟨by convert hleast; rw [le_of_coe], h⟩
+
+    choose r hr1 hr2 using c.nomax q h
+    apply lt_of_lt_of_le (by exact_mod_cast hr2) (hub _ hr1)
 
 end Chapter5
 
 /-- Now to develop analogous results for the Mathlib reals. -/
 
+/-
+Ngl I'm increasingly in a rush to get through this book so I'm not gonna fuss with Mathlib API rn
+So this remains 'sorry'd.
+-/
+
 abbrev Real.toSet_Rat (x:ℝ) : Set ℚ := { q | (q:ℝ) < x }
 
-lemma Real.toSet_Rat_nonempty (x:ℝ) : x.toSet_Rat.Nonempty := by sorry
+lemma Real.toSet_Rat_nonempty (x:ℝ) : x.toSet_Rat.Nonempty := by
+  sorry
 
 lemma Real.toSet_Rat_bounded (x:ℝ) : BddAbove x.toSet_Rat := by sorry
 
