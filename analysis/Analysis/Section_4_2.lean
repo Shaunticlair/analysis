@@ -859,8 +859,8 @@ x * z > y * z := by
   · rw [← hu.2]; ring
 
 
-/- Skipping the Rat API for now
-/--
+-- Skipping the Rat API for now
+/-
   Not in textbook: create an equivalence between Rat and ℚ. This requires some familiarity with
   the API for Mathlib's version of the rationals.
 -/
@@ -886,6 +886,6 @@ abbrev Rat.equivRat_ring : Rat ≃+* ℚ where
   (Not from textbook) The textbook rationals are isomorphic (as a field) to the Mathlib rationals.
 -/
 def Rat.equivRat_ring_symm : ℚ ≃+* Rat := Rat.equivRat_ring.symm
--/
+
 
 end Section_4_2

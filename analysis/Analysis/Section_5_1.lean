@@ -318,13 +318,13 @@ noncomputable def Sequence.sqrt_two : Sequence := (fun n:ℕ ↦ ((⌊ (Real.sqr
   Example 5.1.10. (This requires extensive familiarity with Mathlib's API for the real numbers.)
 
 Shaunticlair note: I'm absolutely not doing that.
-
+-/
   theorem Sequence.ex_5_1_10_a : (1:ℚ).Steady sqrt_two := by sorry
 
   theorem Sequence.ex_5_1_10_b : (0.1:ℚ).Steady (sqrt_two.from 1) := by sorry
 
   theorem Sequence.ex_5_1_10_c : (0.1:ℚ).EventuallySteady sqrt_two := by sorry
--/
+
 
 
 

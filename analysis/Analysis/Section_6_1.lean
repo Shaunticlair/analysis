@@ -80,6 +80,8 @@ lemma Sequence.from_eval (a:Sequence) {m₁ n:ℤ} (hn: n ≥ m₁) :
   (a.from m₁) n = a n := by
   simp [hn]; intros; symm; solve_by_elim [a.vanish]
 
+lemma Sequence.from_start (a:Sequence) {N :ℤ} (hn: N ≥ a.m): (a.from N).m = N := by simp_all
+
 end Chapter6
 
 /-- Definition 6.1.3 (ε-steady) -/
@@ -115,6 +117,12 @@ abbrev Sequence.IsCauchy (a:Sequence) : Prop := ∀ ε > (0:ℝ), ε.EventuallyS
 /-- Definition 6.1.3 (Cauchy sequence) -/
 lemma Sequence.isCauchy_def (a:Sequence) :
   a.IsCauchy ↔ ∀ ε > (0:ℝ), ε.EventuallySteady a := by rfl
+
+/-Unpacked cauchy def-/
+lemma Sequence.isCauchy_def' (a:Sequence):
+  a.IsCauchy ↔ ∀ ε > 0, ∃ N ≥ a.m, ∀ n ≥ N, ∀ m ≥ N, dist (a n) (a m) ≤ ε := by
+  peel with e he N hN n; rw [from_start]; peel with hn m hm;
+  rw [from_eval, from_eval] <;> linarith; linarith
 
 /-- This is almost the same as Chapter5.Sequence.IsCauchy.coe -/
 lemma Sequence.IsCauchy.coe (a:ℕ → ℝ) :
@@ -325,6 +333,9 @@ theorem Sequence.tendsTo_unique (a:Sequence) {L L':ℝ} (h:L ≠ L') :
     _ = 2 * |L-L'|/3 := by grind
   linarith
 
+theorem Sequence.tendsTo_unique' (a:Sequence) {L L':ℝ} (hL: a.TendsTo L) (hL': a.TendsTo L'):
+L = L' := by have hLand := And.intro hL hL'; contrapose! hLand; apply tendsTo_unique at hLand; tauto
+
 /-- Definition 6.1.8 -/
 abbrev Sequence.Convergent (a:Sequence) : Prop := ∃ L, a.TendsTo L
 
@@ -356,6 +367,8 @@ a.TendsTo L ↔ a.Convergent ∧ lim a = L := by
     replace eq := a.tendsTo_unique (eq this)
     apply lim_def at this; tauto
   intro ⟨ h, rfl ⟩; convert lim_def h
+
+
 
 
 /-- Proposition 6.1.11 -/
@@ -552,29 +565,8 @@ Duplicated from 4.3
 theorem Real.close_symm (ε x y:ℝ) : ε.Close x y ↔ ε.Close y x := by
   rw [Real.close_def, Real.close_def]; rw [dist_comm]
 
-theorem Real.close_mul_mul {ε δ x y z w:ℝ} (hxy: ε.Close x y) (hzw: δ.Close z w) :
-    (ε*|z|+δ*|x|+ε*δ).Close (x * z) (y * w) := by
-  have hε : ε ≥ 0 := le_trans (abs_nonneg _) hxy
-  set a := y-x
-  have ha : y = x + a := by grind
-  have haε: |a| ≤ ε := by rwa [close_symm, Real.close_def] at hxy
-  set b := w-z
-  have hb : w = z + b := by grind
-  have hbδ: |b| ≤ δ := by rwa [close_symm, Real.close_def] at hzw
-  have : y*w = x * z + a * z + x * b + a * b := by grind
-  rw [close_symm, Real.close_def]
-  calc
-    _ = |a * z + b * x + a * b| := by rw [Real.dist_eq]; grind
-    _ ≤ |a * z + b * x| + |a * b| := abs_add _ _
-    _ ≤ |a * z| + |b * x| + |a * b| := by simp; grind [abs_add]
-    _ = |a| * |z| + |b| * |x| + |a| * |b| := by grind [abs_mul]
-    _ ≤ _ := by gcongr
-
-theorem Real.close_mul_mul' {ε δ x y z w:ℝ} (hxy: ε.Close x y) (hzw: δ.Close z w) :
-    (ε*|z|+δ*|y|).Close (x * z) (y * w) := by
-    -- Fun fact, I actually found this proof before I found the one above.
-    rw [Real.close_def, Real.dist_eq] at *;
-
+theorem Real.close_mul_mul' {ε δ x y z w:ℝ} (hxy: |x - y| ≤ ε) (hzw: |z - w| ≤ δ) :
+    |x * z - y * w| ≤ ε * |z| + δ * |y| := by
     have h:= abs_add (x*z - y*z) (y*z - y*w);
     have h3: x*z - y*z = (x - y) * z := by ring;
     nth_rw 2 [h3] at h; rw [abs_mul] at h
@@ -589,21 +581,35 @@ theorem Real.close_mul_mul' {ε δ x y z w:ℝ} (hxy: ε.Close x y) (hzw: δ.Clo
     in applications. -/
 theorem Sequence.tendsTo_mul {a b:Sequence} {L M:ℝ} (ha: a.TendsTo L) (hb: b.TendsTo M) :
     (a * b).TendsTo (L * M) := by
+  choose D hD0 hD using bounded_of_convergent (⟨M, hb⟩)
   rw [tendsTo_iff] at *;
-  intro e he; specialize ha (e/(2*(|M|+1))) (by sorry);
-  specialize hb (e/(2*(|L|+1))) (by sorry);
+  intro e he; specialize ha (e/(2*(|D|+1))) (by positivity);
+  specialize hb (e/(2*(|L|+1))) (by positivity);
   choose A ha using ha; choose B hb using hb; use max A B; intro n hn
   specialize ha n (by grind); specialize hb n (by grind)
-  simp; have := abs_mul (a.seq n - L) (b.seq n - M)
-  replace := this ▸ (mul_le_mul ha hb (by positivity) (by positivity))
-  convert le_trans ?_ this
-  rw [Real.mul_self_sqrt (by positivity)]
+  simp;
+  apply le_trans ( Real.close_mul_mul' ha hb )
+  rw [boundedBy_def] at hD; specialize hD n; replace hD := hD.trans (le_abs_self D)
+  nth_rw 3 [show e = e/2 + e/2 by ring]; gcongr
+  · calc
+      _ = e/2 * (|b.seq n|/(|D| + 1)) := by field_simp;
+      _ ≤ e/2 * (|D|/(|D| + 1)) := by gcongr
+      _ ≤ e/2 * 1 := by gcongr; exact div_le_one_of_le₀ (by linarith) (by positivity)
+      _ ≤ e/2 := by field_simp
+  · by_cases hL: L = 0
+    · subst hL; field_simp; linarith
+    calc
+    _ = e/2 * (|L|/(|L| + 1)) := by field_simp
+    _ ≤ e/2 * 1 := by gcongr; exact div_le_one_of_le₀ (by linarith) (by positivity)
+    _ ≤ e/2 := by field_simp
 
-  sorry
+
 
 theorem Sequence.lim_mul {a b:Sequence} (ha: a.Convergent) (hb: b.Convergent) :
     (a * b).Convergent ∧ lim (a * b) = lim a * lim b := by
-  sorry
+  choose L ha using ha; choose M hb using hb
+  rw [← Sequence.lim_eq]; convert tendsTo_mul ha hb
+  <;> rw [lim_eq] at ha hb <;> simp_all
 
 
 instance Sequence.inst_smul : SMul ℝ Sequence where
@@ -624,11 +630,45 @@ theorem Sequence.smul_coe (c:ℝ) (a:ℕ → ℝ) : (c • (a:Sequence)) = (fun 
     in applications. -/
 theorem Sequence.tendsTo_smul (c:ℝ) {a:Sequence} {L:ℝ} (ha: a.TendsTo L) :
     (c • a).TendsTo (c * L) := by
-  sorry
+  rw [tendsTo_iff] at *; intro e he; specialize ha (e/(|c|+1)) (by positivity); choose N ha using ha
+  use N; peel ha with n hn ha; simp; rw [← mul_sub_left_distrib]
+  rw [abs_mul]
+  calc
+    _ ≤ |c| * (e / (|c| + 1)) := by gcongr
+    _ = e * (|c| / (|c| + 1)) := by ring
+    _ ≤ e * 1 := by gcongr; exact div_le_one_of_le₀ (by linarith) (by positivity)
+    _ = e := by ring
 
 theorem Sequence.lim_smul (c:ℝ) {a:Sequence} (ha: a.Convergent) :
     (c • a).Convergent ∧ lim (c • a) = c * lim a := by
-  sorry
+  choose L ha using ha
+  rw [← Sequence.lim_eq]; convert tendsTo_smul c ha
+  rw [lim_eq] at ha ; simp_all
+
+instance Sequence.neg : Neg Sequence where
+  neg a := {
+    m := a.m
+    seq n := -(a n)
+    vanish n hn := by simp [a.vanish n hn]
+  }
+
+@[simp]
+theorem Sequence.neg_eval {a: Sequence} (n:ℤ) : (-a) n = -(a n) := rfl
+
+theorem Sequence.neg_coe (a: ℕ → ℝ) : (-(a:Sequence)) = (fun n ↦ -(a n)) := by
+  ext n; rfl
+  by_cases h:n ≥ 0 <;> simp [h]
+
+theorem Sequence.tendsTo_neg {a:Sequence} {L:ℝ} (ha: a.TendsTo L) :
+    (-a).TendsTo (-L) := by
+  rw [tendsTo_iff] at *; peel ha with e he N n hn ha
+  convert ha using 1; rw [← neg_sub, abs_neg]; simp; congr 1; ring
+
+theorem Sequence.lim_neg {a:Sequence} (ha: a.Convergent) :
+    (-a).Convergent ∧ lim (-a) = -(lim a) := by
+  choose L ha using ha
+  rw [← Sequence.lim_eq]; convert tendsTo_neg ha
+  rw [lim_eq] at ha; simp_all
 
 instance Sequence.inst_sub : Sub Sequence where
   sub a b := {
@@ -644,15 +684,20 @@ theorem Sequence.sub_coe (a b: ℕ → ℝ) : (a:Sequence) - (b:Sequence) = (fun
   ext n; rfl
   by_cases h:n ≥ 0 <;> simp [h]
 
+theorem Sequence.sub_eq_add_neg (a b:Sequence) : a - b = a + (-b) := by
+  ext n; rfl; simp; ring
+
 /-- Theorem 6.1.19(d) (limit laws).  The `tendsTo` version is more usable than the `lim` version
     in applications. -/
 theorem Sequence.tendsTo_sub {a b:Sequence} {L M:ℝ} (ha: a.TendsTo L) (hb: b.TendsTo M) :
     (a - b).TendsTo (L - M) := by
-  sorry
+  rw [show L - M = L + (-M) by ring, sub_eq_add_neg]; convert tendsTo_add ha (tendsTo_neg hb)
 
 theorem Sequence.LIM_sub {a b:Sequence} (ha: a.Convergent) (hb: b.Convergent) :
     (a - b).Convergent ∧ lim (a - b) = lim a - lim b := by
-  sorry
+  rw [show lim a - lim b = lim a + (- lim b) by ring, sub_eq_add_neg]; convert lim_add ha (lim_neg hb).1
+  apply (lim_neg hb).2.symm
+
 
 noncomputable instance Sequence.inst_inv : Inv Sequence where
   inv a := {
@@ -668,15 +713,50 @@ theorem Sequence.inv_coe (a: ℕ → ℝ) : (a:Sequence)⁻¹ = (fun n ↦ (a n)
   ext n; rfl
   by_cases h:n ≥ 0 <;> simp [h]
 
+#check Sequence.IsCauchy.convergent
+
+abbrev Sequence.EventuallyBoundedAwayZero (a: Sequence) : Prop :=
+  ∃ (i : ℤ), ∃ (c:ℝ), c > 0 ∧ ∀ n ≥ i, |a n| ≥ c
+
+theorem Sequence.boundedAwayZero_of_convergent_nonzero {a:Sequence} {L:ℝ} (ha: a.TendsTo L) (hL: L ≠ 0) :
+    a.EventuallyBoundedAwayZero := by
+  rw [tendsTo_iff] at ha; choose N ha using ha (|L/2|) (by positivity)
+  refine ⟨N ,|L/2|, by positivity, ?_⟩; peel ha with n hn ha
+  simp; rw [abs_sub_comm] at ha
+  suffices |L/2|+ |L/2| ≤ |a n| + |L/2|  by linarith
+  calc
+    _ = |L| := by ring; rw [abs_mul, abs_of_pos (by norm_num : (0:ℝ) < 1/2)]; ring
+    _ ≤ |a n| + |L - a n| := by simpa [Real.dist_eq, abs_sub_comm] using (dist_triangle 0 (a n) L);
+    _ ≤ |a n| + |L/2| := by simp [ha]
+
+
+
 /-- Theorem 6.1.19(e) (limit laws).  The `tendsTo` version is more usable than the `lim` version
     in applications. -/
 theorem Sequence.tendsTo_inv {a:Sequence} {L:ℝ} (ha: a.TendsTo L) (hnon: L ≠ 0) :
     (a⁻¹).TendsTo (L⁻¹) := by
-  sorry
+  choose k A hA using boundedAwayZero_of_convergent_nonzero ha hnon
+  choose i C hC hbound using boundedAwayZero_of_convergent_nonzero ha hnon
+  rw [tendsTo_iff] at *; intro e he; choose j ha using ha (e * |L| * C) (by positivity)
+  use max i (max j k); intro n hn; simp at hn
+  have : 0 < |a n| := lt_of_lt_of_le hC (hbound n (by simp [hn]))
+  have hnona: 0 ≠ a n := by aesop
+  calc
+    _ = |1/(a n) - 1/L| := by simp
+    _ = |(L - a n) / (a n * L)| := by congr 1; field_simp [hnon];
+    _ = |L - a n| / (|a n| * |L|) := by rw [abs_div, abs_mul]
+    _ ≤ (e * |L| * C) / (C * |L|) := by gcongr;
+                                        · rw [abs_sub_comm]; simp [ha, hn]
+                                        · apply hbound; simp [hn]
+    _ = e := by field_simp; ring
+    _ ≤ e := by simp
+
+#check Sequence.tendsTo_unique'
 
 theorem Sequence.lim_inv {a:Sequence} (ha: a.Convergent) (hnon: lim a ≠ 0) :
   (a⁻¹).Convergent ∧ lim (a⁻¹) = (lim a)⁻¹ := by
-  sorry
+    rw [← Sequence.lim_eq]; choose L ha using ha; convert tendsTo_inv (lim_def ⟨L,ha⟩) hnon
+
 
 noncomputable instance Sequence.inst_div : Div Sequence where
   div a b := {
@@ -692,15 +772,19 @@ theorem Sequence.div_coe (a b: ℕ → ℝ) : (a:Sequence) / (b:Sequence) = (fun
   ext n; rfl
   by_cases h:n ≥ 0 <;> simp [h]
 
+theorem Sequence.div_eq_mul_inv (a b:Sequence) : a / b = a * b⁻¹ := by
+  ext n; rfl; simp; ring
+
 /-- Theorem 6.1.19(f) (limit laws).  The `tendsTo` version is more usable than the `lim` version
     in applications. -/
 theorem Sequence.tendsTo_div {a b:Sequence} {L M:ℝ} (ha: a.TendsTo L) (hb: b.TendsTo M) (hnon: M ≠ 0) :
     (a / b).TendsTo (L / M) := by
-  sorry
+  rw [show L / M = L * M⁻¹ by ring, div_eq_mul_inv]; convert tendsTo_mul ha (tendsTo_inv hb hnon)
 
 theorem Sequence.lim_div {a b:Sequence} (ha: a.Convergent) (hb: b.Convergent) (hnon: lim b ≠ 0) :
   (a / b).Convergent ∧ lim (a / b) = lim a / lim b := by
-  sorry
+  rw [show lim a / lim b = lim a * (lim b)⁻¹ by ring, div_eq_mul_inv]; convert lim_mul ha (lim_inv hb hnon).1
+  apply (lim_inv hb hnon).2.symm
 
 instance Sequence.inst_max : Max Sequence where
   max a b := {
@@ -716,15 +800,38 @@ theorem Sequence.max_coe (a b: ℕ → ℝ) : (a:Sequence) ⊔ (b:Sequence) = (f
   ext n; rfl
   by_cases h:n ≥ 0 <;> simp [h]
 
+theorem Sequence.eventually_le {a b:Sequence} {L M:ℝ} (ha: a.TendsTo L) (hb: b.TendsTo M) (hLM: L < M) :
+    ∃ N, ∀ n ≥ N, a n < b n := by
+  rw [tendsTo_iff] at *; choose A ha using ha ((M-L)/3) (by linarith);
+  choose B hb using hb ((M-L)/3) (by linarith); use max A B; intro n hn
+  specialize ha n (by grind); specialize hb n (by grind)
+  have : a.seq n ≤ L + (M-L)/3 := by linarith [le_abs_self (a n - L), ha]
+  have : M - (M-L)/3 ≤ b.seq n := by linarith [neg_le_abs (b n - M), hb]
+  linarith
+
 /-- Theorem 6.1.19(g) (limit laws).  The `tendsTo` version is more usable than the `lim` version
     in applications. -/
 theorem Sequence.tendsTo_max {a b:Sequence} {L M:ℝ} (ha: a.TendsTo L) (hb: b.TendsTo M) :
     (max a b).TendsTo (max L M) := by
-  sorry
+  have hab := eventually_le ha hb; have hba:= eventually_le hb ha;
+  rw [tendsTo_iff] at *; intro e he; specialize ha e he; specialize hb e he;
+  choose A ha using ha; choose B hb using hb;
+  simp;
+  rcases lt_trichotomy L M with hLM | rfl | hLM
+  · choose C hC using hab hLM;
+    use max A (max B C); intro n hn; specialize ha n (by grind); specialize hb n (by grind);
+    simpa [le_of_lt hLM, le_of_lt (hC n (by grind))]
+  · use max A B; intro n hn; specialize ha n (by grind); specialize hb n (by grind);
+    simp [max_def]; split_ifs <;> assumption
+  · choose D hD using hba hLM
+    use max A (max B D); intro n hn; specialize ha n (by grind); specialize hb n (by grind);
+    simpa [le_of_lt hLM, le_of_lt (hD n (by grind))]
 
 theorem Sequence.lim_max {a b:Sequence} (ha: a.Convergent) (hb: b.Convergent) :
     (max a b).Convergent ∧ lim (max a b) = max (lim a) (lim b) := by
-  sorry
+    choose L ha using ha; choose M hb using hb
+    rw [← Sequence.lim_eq]; convert tendsTo_max ha hb
+    <;> rw [lim_eq] at ha hb <;> simp_all
 
 instance Sequence.inst_min : Min Sequence where
   min a b := {
@@ -740,33 +847,57 @@ theorem Sequence.min_coe (a b: ℕ → ℝ) : (a:Sequence) ⊓ (b:Sequence) = (f
   ext n; rfl
   by_cases h:n ≥ 0 <;> simp [h]
 
+lemma Sequence.neg_neg (a:Sequence) : - - a = a := by
+  ext n; rfl; simp
+
+lemma Sequence.min_neg_neg (a b:Sequence) : min (- a) (- b) = - max a b := by
+  ext n; rfl; simp [← _root_.min_neg_neg];
+
 /-- Theorem 6.1.19(h) (limit laws) -/
 theorem Sequence.tendsTo_min {a b:Sequence} {L M:ℝ} (ha: a.TendsTo L) (hb: b.TendsTo M) :
     (min a b).TendsTo (min L M) := by
-  sorry
+  rw [← neg_neg a, ← neg_neg b, ← _root_.neg_neg L, ← _root_.neg_neg M];
+  rw [_root_.min_neg_neg, min_neg_neg]
+  apply tendsTo_neg; apply tendsTo_max (tendsTo_neg ha) (tendsTo_neg hb)
 
 theorem Sequence.lim_min {a b:Sequence} (ha: a.Convergent) (hb: b.Convergent) :
     (min a b).Convergent ∧ lim (min a b) = min (lim a) (lim b) := by
-  sorry
+    choose L ha using ha; choose M hb using hb
+    rw [← Sequence.lim_eq]; convert tendsTo_min ha hb
+    <;> rw [lim_eq] at ha hb <;> simp_all
 
 /-- Exercise 6.1.1 -/
 theorem Sequence.mono_if {a: ℕ → ℝ} (ha: ∀ n, a (n+1) > a n) {n m:ℕ} (hnm: m > n) : a m > a n := by
-  sorry
+  induction' m with m ih
+  · simp_all
+  simp [Nat.lt_add_one_iff] at hnm
+  rcases le_iff_lt_or_eq.mp hnm with hnm | rfl
+  · specialize ih hnm; specialize ha m; linarith
+  apply ha
 
 /-- Exercise 6.1.3 -/
 theorem Sequence.tendsTo_of_from {a: Sequence} {c:ℝ} (m:ℤ) :
     a.TendsTo c ↔ (a.from m).TendsTo c := by
-  sorry
+  rw [tendsTo_iff, tendsTo_iff]; peel with e he
+  constructor <;> intro h <;> (choose N hN using h; use max N (max m a.m); intro n hn; simp at hn; specialize hN n hn.1)
+  simpa [hn]; simpa [hn] using hN
 
 /-- Exercise 6.1.4 -/
 theorem Sequence.tendsTo_of_shift {a: Sequence} {c:ℝ} (k:ℕ) :
     a.TendsTo c ↔ (Sequence.mk' a.m (fun n : {n // n ≥ a.m} ↦ a (n+k))).TendsTo c := by
-  sorry
+  rw [tendsTo_iff, tendsTo_iff]; peel with e he
+  constructor <;> (rintro ⟨N, h⟩; use max (N+k) (a.m+k); intro n hn; simp at hn)
+  · specialize h (n+k) (by grind); simpa [(by grind: a.m ≤ n)]
+  specialize h (n-k) (by grind); simpa [(by grind: a.m ≤ n - k)] using h
 
 /-- Exercise 6.1.7 -/
 theorem Sequence.isBounded_of_rat (a: Chapter5.Sequence) :
     a.IsBounded ↔ (a:Sequence).IsBounded := by
   sorry
+
+theorem Sequence.lim_const (r : ℝ ):
+  ((fun _:ℕ ↦ r):Sequence).Convergent ∧ lim ((fun _:ℕ ↦ r):Sequence) = r := by
+  rw [←lim_eq, tendsTo_iff]; intro ε hε; use 0; intro n hn; simp [hn]; linarith
 
 /-- Exercise 6.1.9 -/
 theorem Sequence.lim_div_fail :
@@ -774,7 +905,15 @@ theorem Sequence.lim_div_fail :
     ∧ b.Convergent
     ∧ lim b = 0
     ∧ ¬ ((a / b).Convergent ∧ lim (a / b) = lim a / lim b) := by
-  sorry
+  use (fun _:ℕ  ↦  (1:ℝ)); use (fun (n:ℕ) ↦ (n+1:ℝ)⁻¹)
+  refine ⟨(lim_const 1).1, Sequence.lim_harmonic.1, Sequence.lim_harmonic.2, ?_⟩
+  rw [not_and_or]; left; simp_rw [convergent_def,tendsTo_iff ]; push_neg; intro L
+  use 1; simp; intro N; choose n hn using exists_nat_gt L;
+  use max (n+10) (N+10) ; refine ⟨by grind, ?_⟩;
+  split_ifs with h; simp_all;
+  · suffices ↑(max (↑n) N + 10).toNat > L by rw [abs_of_pos (by linarith)]; linarith
+    apply lt_of_lt_of_le hn; simp; grind
+  grind
 
 theorem Chapter5.Sequence.IsCauchy_iff (a:Chapter5.Sequence) :
     a.IsCauchy ↔ ∀ ε > (0:ℝ), ∃ N ≥ a.n₀, ∀ n ≥ N, ∀ m ≥ N, |a n - a m| ≤ ε := by
