@@ -915,6 +915,8 @@ theorem Sequence.lim_div_fail :
     apply lt_of_lt_of_le hn; simp; grind
   grind
 
+
+
 theorem Chapter5.Sequence.IsCauchy_iff (a:Chapter5.Sequence) :
     a.IsCauchy ↔ ∀ ε > (0:ℝ), ∃ N ≥ a.n₀, ∀ n ≥ N, ∀ m ≥ N, |a n - a m| ≤ ε := by
   sorry
