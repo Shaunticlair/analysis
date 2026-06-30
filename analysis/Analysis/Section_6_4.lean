@@ -928,11 +928,33 @@ theorem Sequence.extended_limit_point_ge_liminf {a:Sequence} {L:EReal} (h:a.Exte
 
 /-- Exercise 6.4.9 -/
 theorem Sequence.exists_three_limit_points : ∃ a:Sequence, ∀ L:EReal, a.ExtendedLimitPoint L ↔ L = ⊥ ∨ L = 0 ∨ L = ⊤ := by
-
-  sorry
+  let f : ℕ → ℝ := fun m ↦ if Even m then m*(-1)^(m/2) else 0; -- Even terms alternate between pos and neg, based on n/2 polarity
+  use f; intro L; constructor <;> intro h -- Minimize dist: 1. dist btwn abs 2. pick min from odd (|r|) and even (|n|-|r|) terms
+  · contrapose! h; have ⟨h1,h2,h3⟩:=h; lift L to ℝ using ⟨h3,h1⟩; simp at h2; unfold ExtendedLimitPoint; simp [h1,h3]
+    choose n hn using exists_nat_gt (|L|); use min (|L|/2) ((|(n:ℝ)|-|L|)/2); refine ⟨lt_min (by simp [h2]) (by simp [hn]), ?_⟩
+    use n; refine ⟨by grind, ?_⟩; intro z hz hnz; lift z to ℕ using hz; simp_all
+    by_cases h : Even z <;> [right; left] <;> simp [dist, f, h] -- As mentioned above: use abs distance
+    · apply lt_of_lt_of_le ?_ (abs_abs_sub_abs_le _ _); simp [abs_mul];
+      have hz: 0 < (z:ℝ) - |L| := by simp_all; apply lt_of_lt_of_le hn (by simp_all) -- Slight annoyance
+      nth_rw 2 [abs_of_pos (by grind)]; apply lt_of_le_of_lt ?_ (half_lt_self hz); gcongr
+    exact h2 -- L is always at least L/2 away from 0
+  rcases h with (rfl | rfl | rfl) -- n>r doesn't mean -n<r. We choose n further from 0 than r: |r|<n. So, -n < |r| ≤ r .
+  · unfold ExtendedLimitPoint; simp; intro r; choose n hn using exists_nat_gt (|r|); use 2*(2*n+1); simp [f]; use (by omega)
+    rw [if_pos (by omega),if_pos ⟨2*n+1, by omega⟩, Odd.neg_one_pow ⟨n, by omega⟩]; simp; -- Choose n/2 odd: neg term below r
+    apply lt_of_lt_of_le ?_ (neg_abs_le r); simp; apply lt_trans hn; simp; omega -- Choosing odd required bigger m than n.
+  · intro e he z hz; use 2*z+1; refine ⟨by grind, ?_⟩; simp [f]; -- Odd term, so we get exactly 0
+    rw [if_pos (by grind), if_pos (by grind), if_neg (by grind)]; simp; linarith -- Just need to handle a bunch of side conds
+  unfold ExtendedLimitPoint; simp; intro r; choose n hn using exists_nat_gt r; use 2*(2*n); simp [f] -- Choose n/2 even: pos above r
+  rw [if_pos ⟨2*n, by omega⟩, Even.neg_one_pow ⟨n, by omega⟩]; apply lt_of_lt_of_le hn; simp; omega -- Choose even required bigger m than n.
 
 /-- Exercise 6.4.10 -/
-theorem Sequence.limit_points_of_limit_points {a b:Sequence} {c:ℝ} (hab: ∀ n ≥ b.m, a.LimitPoint (b n)) (hbc: b.LimitPoint c) : a.LimitPoint c := by sorry
+theorem Sequence.limit_points_of_limit_points {a b:Sequence} {c:ℝ} (hab: ∀ n ≥ b.m, a.LimitPoint (b n)) (hbc: b.LimitPoint c) : a.LimitPoint c := by
+  unfold LimitPoint at *; intro e he N hN;
+  obtain ⟨n, hn, hbc⟩ := hbc (e/3) (by aesop) (max N b.m) (by aesop);
+  obtain ⟨m, hm, hab⟩ := hab n (by aesop) (e/3) (by aesop) (max N a.m) (by aesop);
+  simp at *; obtain ⟨hn1, hn2⟩ := hn; obtain ⟨hm1, hm2⟩ := hm;
+  use m, (by simp_all); simp [hn1,hn2, hm1,hm2] at *;
+  apply le_trans (dist_triangle _ ( b.seq n) _) (by linarith)
 
 
 end Chapter6
