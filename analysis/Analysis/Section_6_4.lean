@@ -694,6 +694,17 @@ theorem Sequence.lim_of_between {a b c:Sequence} {L:ℝ} (hm: b.m = a.m ∧ c.m 
   have ⟨ha1, ha2⟩ := ha n (by grind); have ⟨hc1, hc2⟩ := hc n (by grind); have ⟨hab, hbc⟩ := habc n (by grind)
   constructor <;> linarith
 
+-- Technically more lines, but conceptually simpler approach.
+theorem Sequence.lim_of_between' {a b c:Sequence} {L:ℝ} (hm: b.m = a.m ∧ c.m = a.m)
+  (habc: ∀ n ≥ a.m, a n ≤ b n ∧ b n ≤ c n) (ha: a.TendsTo L) (hc: c.TendsTo L) :
+    b.TendsTo L := by
+  rw [Sequence.tendsTo_iff_eq_limsup_liminf] at *; constructor <;> apply le_antisymm
+  · rw [← hc.1]; apply liminf_mono (by grind) (by grind)
+  · rw [← ha.1]; apply liminf_mono (by grind) (by grind)
+  · rw [← hc.2]; apply limsup_mono (by grind) (by grind)
+  · rw [← ha.2]; apply limsup_mono (by grind) (by grind)
+
+
 /-- Example 6.4.15 -/
 lemma ex6_4_15 : ((fun (n:ℕ) ↦ 2/(n+1:ℝ)):Sequence).TendsTo 0 := by
   convert Sequence.tendsTo_smul 2 (Sequence.lim_eq.mpr Sequence.lim_harmonic)
