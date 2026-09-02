@@ -125,7 +125,7 @@ theorem finite_series_const_mul {m n:ℤ}  (a: ℤ → ℝ) (c:ℝ) :
   all_goals linarith
 
 /-- Lemma 7.1.4(e) / Exercise 7.1.1 -/
-theorem abs_finite_series_le {m n:ℤ}   (a: ℤ → ℝ) (c:ℝ) :
+theorem abs_finite_series_le {m n:ℤ}   (a: ℤ → ℝ)  :
   |∑ i ∈ Icc m n, a i| ≤ ∑ i ∈ Icc m n, |a i| := by
   by_cases h: n < m
   · rw [sum_of_empty, sum_of_empty]; norm_num; all_goals linarith
@@ -138,15 +138,17 @@ theorem abs_finite_series_le {m n:ℤ}   (a: ℤ → ℝ) (c:ℝ) :
   simp; apply hr (by linarith)
   all_goals linarith
 
+
+
 /-- Lemma 7.1.4(f) / Exercise 7.1.1 -/
 theorem finite_series_of_le {m n:ℤ}  {a b: ℤ → ℝ} (h: ∀ i, m ≤ i → i ≤ n → a i ≤ b i) :
   ∑ i ∈ Icc m n, a i ≤ ∑ i ∈ Icc m n, b i := by
-  by_cases hnot_sdiff_comm: n < m
+  by_cases hnm: n < m
   · rw [sum_of_empty, sum_of_empty]; all_goals linarith
   obtain ⟨r, rfl⟩ : ∃ r:ℕ, n = m + r := ⟨(n-m).toNat, by aesop⟩
   induction' r with r hr
   · simp only [CharP.cast_eq_zero, add_zero, sum_of_single];
-    apply h m; all_goals linarith
+    apply h; all_goals linarith
   specialize hr (by peel h with i hm h; intro hmr; apply h (by omega)) (by linarith)
   simp; rw [← add_assoc]; repeat rw [sum_of_nonempty]
   apply add_le_add hr (by apply h; all_goals omega)
@@ -167,7 +169,7 @@ set_option maxHeartbeats 220000 in
   term of `h` (at whatever index `j` maps to `x`) to the end via `h'`, delete `x` from `X`, and
   apply the induction hypothesis to the two induced bijections `Icc 1 n → X.erase x`.
 -/
-theorem finite_series_of_rearrange' {n:ℕ} {X':Type*} (X: Finset X') (hcard: X.card = n)
+theorem finite_series_of_rearrange {n:ℕ} {X':Type*} (X: Finset X') (hcard: X.card = n)
   (f: X' → ℝ) (g h: Icc (1:ℤ) n → X) (hg: Function.Bijective g) (hh: Function.Bijective h) :
 
     ∑ i ∈ Icc (1:ℤ) n, (if hi:i ∈ Icc (1:ℤ) n then f (g ⟨ i, hi ⟩) else 0)
@@ -231,7 +233,7 @@ theorem finite_series_of_rearrange' {n:ℕ} {X':Type*} (X: Finset X') (hcard: X.
     fun i ↦ ⟨ (h' i).val, by simp [mem_erase, Subtype.val_inj, h'_ne_x] ⟩
   set ftil : X.erase x → ℝ := fun y ↦ f y.val  -- create f_ restricted to X\{x}
 
-  -- If card is equal, then inj is sufficient
+
   have hcard : Nat.card { x // x ∈ Icc 1 (n:ℤ) } = Nat.card { y // y ∈ X.erase x } := by
     rw [Nat.card_eq_finsetCard, Int.card_Icc] -- Left side: |Icc 1 n| = n
     rw [Nat.card_eq_finsetCard, Finset.card_erase_of_mem (x.prop)] -- Right side: |X\{x}| = |X|-1 = n
@@ -244,7 +246,7 @@ theorem finite_series_of_rearrange' {n:ℕ} {X':Type*} (X: Finset X') (hcard: X.
     simpa using hab
 
   have why : Function.Bijective gtil := by
-    rw [Nat.bijective_iff_injective_and_card ] -- Stolen from rkirov on github, ty rkirov
+    rw [Nat.bijective_iff_injective_and_card ] -- If card is equal, then inj is sufficient
     refine ⟨?_, hcard⟩;
     intro a b hab; simp [gtil] at hab; rw [Subtype.eq_iff]; -- Setting up
     apply hπ_pseudoinj (?_: n ≤ n+1) (?_) (?_) (hg.injective (Subtype.val_inj.1 hab)) <;> simp-- Repeated injectivity
@@ -297,16 +299,20 @@ theorem finite_series_eq {n:ℕ} {Y:Type*} (X: Finset Y) (f: Y → ℝ) (g: Icc 
 
 /-- Proposition 7.1.11(a) / Exercise 7.1.2 -/
 theorem finite_series_of_empty {X':Type*} (f: X' → ℝ) : ∑ i ∈ ∅, f i = 0 := by
-  rw [finite_series_eq (n:=0)];
-  rw [sum_of_empty (by norm_num)];
+  rw [finite_series_eq (n:=0), sum_of_empty (by norm_num)];
   have : Icc 1 ((0:ℕ):ℤ) = ∅ := by ext i; simp only [notMem_empty, iff_false, mem_Icc]; aesop
   use fun i ↦ absurd i.prop (by simp only [this]; apply notMem_empty)
-
-  sorry
+  constructor
+  · intro i j hij; simp_all; have := i.prop; simp [-coe_mem, notMem_empty] at this
+  · intro x; absurd x.prop; simp [-coe_mem]
 
 /-- Proposition 7.1.11(b) / Exercise 7.1.2 -/
 theorem finite_series_of_singleton {X':Type*} (f: X' → ℝ) (x₀:X') : ∑ i ∈ {x₀}, f i = f x₀ := by
-  sorry
+  choose g hg using exist_bijection (n:=1) {x₀} (by simp only [card_singleton]) -- We proved in ch3 that {x₀} has cardinality 1
+  -- ... Well, we proved it for Set, but proving it for Finset feels redundant
+  --let g : Icc (1:ℤ) (1:ℕ) → ({x₀} : Finset X') := fun i ↦ ⟨x₀, by simp⟩
+  rw [finite_series_eq (n:=1) (g:=g) (hg:=hg)];
+  · simp only [Nat.cast_one]; rw [sum_of_single]; simp; congr; rw [Subtype.coe_eq_iff]; use (by simp); grind
 
 /--
   A technical lemma relating a sum over a finset with a sum over a fintype. Combines well with
@@ -315,32 +321,133 @@ theorem finite_series_of_singleton {X':Type*} (f: X' → ℝ) (x₀:X') : ∑ i 
 theorem finite_series_of_fintype {X':Type*} (f: X' → ℝ) (X: Finset X') :
     ∑ x ∈ X, f x = ∑ x:X, f x.val := (sum_coe_sort X f).symm
 
+#check finite_series_eq
+
+
+
+
+
+
+#check Finset.sum
+#check Finset.univ
 /-- Proposition 7.1.11(c) / Exercise 7.1.2 -/
-theorem map_finite_series {X:Type*} [Fintype X] [Fintype Y] (f: X → ℝ) {g:Y → X}
+theorem map_finite_series {X Y:Type*} [Fintype X] [Fintype Y] (f: X → ℝ) {g:Y → X}
   (hg: Function.Bijective g) :
-    ∑ x, f x = ∑ y, f (g y) := by sorry
+    ∑ x, f x = ∑ y, f (g y) := by
+  show ∑ x ∈ (Finset.univ : Finset X), f x = ∑ y ∈ (Finset.univ : Finset Y), f (g y) -- For my understanding
+  let n:= Finset.card (Finset.univ : Finset Y)
+  have hcard : Finset.card (Finset.univ : Finset X) = n := (Fintype.card_of_bijective hg).symm
+  choose s hs using exist_bijection (n:=n) (Finset.univ : Finset Y) rfl
+  rw [finite_series_eq (Finset.univ : Finset Y) (n:=n) (g:=s) (hg:=hs)]
+  let s': Icc 1 (n:ℤ) → Y := fun i ↦ s i
+  let g' : Y → (Finset.univ : Finset X) := fun y ↦ ⟨g y, mem_univ _⟩
+  rw [finite_series_eq (Finset.univ : Finset X) (n:=n) (g:=g' ∘ s') ]; rfl
+  rw [Fintype.bijective_iff_injective_and_card]; refine ⟨?_, by simp [Fintype.card, hcard]⟩
+  · intro i j hij; simp [g'] at hij; apply hg.injective at hij; simp [s'] at hij; apply hs.injective
+    exact Subtype.eq hij
+
 
 -- Proposition 7.1.11(d) is `rfl` in our formalism and is therefore omitted.
 
+abbrev Icc_castSucc {m n:ℤ} (i: Icc m n): Icc m (n+1) :=
+  ⟨i + 1, by have := i.prop;
+             simp_all [-coe_mem]; linarith⟩
+
+abbrev Icc_castPred {m n:ℤ} (i : Icc m (n+1)) (hi : i.val < n+1): Icc m n :=
+  ⟨i, by have := i.prop;
+             simp_all [-coe_mem]; linarith⟩
+
+lemma sum_congr' {m n:ℤ} (f g: ℤ → ℝ) (h: ∀ i, m ≤ i → i ≤ n → f i = g i) :
+    ∑ i ∈ Icc m n, f i = ∑ i ∈ Icc m n, g i := by
+  by_cases hnm: n < m
+  · rw [sum_of_empty, sum_of_empty]; all_goals linarith
+  obtain ⟨r, rfl⟩ : ∃ r:ℕ, n = m + r := ⟨(n-m).toNat, by aesop⟩
+  induction' r with r hr
+  · simp [h]
+  simp; rw [← add_assoc]; repeat rw [sum_of_nonempty (by linarith)]
+  rw [hr (by intro i hmi hmr; apply h _ hmi; omega) (by simp_all)];
+  rw [h _ (by linarith) (by omega)];
+
+
+theorem finite_series_of_insert {Z:Type*} {X: Finset Z} (y : Z) (hy : y ∉ X) (f: Z → ℝ) :
+    ∑ z ∈ X ∪ {y}, f z = ∑ z ∈ X, f z + f y := by
+  choose s hs using exist_bijection X rfl
+  rw [finite_series_eq X f s hs]
+  let s' : Icc 1 ((#X :ℤ)+1) → (X ∪ {y} : Finset Z) :=
+    fun i ↦ if hi : i.val ∈ Icc 1 (#X :ℤ) then
+    ⟨((s (Icc_castPred i (by simp_all; linarith)))), by simp_all⟩  else ⟨y, by simp⟩
+  let s'' : Icc 1 ((#X :ℤ)+1) → (X ∪ {y} : Finset Z) :=
+    fun i ↦ if hi : i.val ≤ (#X :ℤ) then
+    ⟨((s (Icc_castPred i (by linarith)))), by simp_all⟩  else ⟨y, by simp⟩
+  have hs'': Function.Bijective s'' := by -- I feel like it's reasonable to reuse card_insert_of_notMem (equiv in ch3)
+    rw [Fintype.bijective_iff_injective_and_card]; refine ⟨?_, by simp [Fintype.card,card_insert_of_notMem hy] ⟩
+    · intro i j hij;
+      by_cases hi : i.val ≤ #X <;> by_cases hj : j.val ≤ #X <;> have hi' := i.prop <;> have hj' := j.prop <;>
+      simp [s'', hi, hj, -coe_mem, Icc_castPred] at hij hi' hj' <;> try grind -- Either linarith or contradiction
+      · rw [Subtype.val_inj] at hij; apply hs.injective at hij; grind
+  rw [finite_series_eq (X ∪ {y}) f s'' hs'' (n:= #X + 1)]; simp only [Nat.cast_add, Nat.cast_one,]
+  rw [sum_of_nonempty (by simp)]; unfold s''
+  congr 1; swap; simp
+  simp; apply sum_congr'; intro i hi1 hi2; repeat rw [dif_pos (by constructor<;>linarith)]
+  simp [hi2]; intro h; linarith
+
+
 /-- Proposition 7.1.11(e) / Exercise 7.1.2 -/
 theorem finite_series_of_disjoint_union {Z:Type*} {X Y: Finset Z} (hdisj: Disjoint X Y) (f: Z → ℝ) :
-    ∑ z ∈ X ∪ Y, f z = ∑ z ∈ X, f z + ∑ z ∈ Y, f z := by sorry
+    ∑ z ∈ X ∪ Y, f z = ∑ z ∈ X, f z + ∑ z ∈ Y, f z := by
+    generalize h: Y.card = n; revert Y
+    induction' n with n ih
+    · intro Y hdisj h; rw [card_eq_zero] at h; subst h; simp only [union_empty, finite_series_of_empty, add_zero]
+    intro Y hdisj h;
+    choose y hy using (by rw [← Finset.card_ne_zero]; linarith : Y.Nonempty)
+    let Y' := Y.erase y
+    have hsep : Y = Y' ∪ {y} := by grind
+    have hsep' : (X ∪ Y) = (X ∪ Y') ∪ {y} := by grind
+    rw [Finset.disjoint_left] at hdisj
+    rw [hsep', hsep]
+    rw [finite_series_of_insert y (by grind), finite_series_of_insert y (by grind)];
+    rw [← add_assoc]; simp
+    apply ih
+    · rw [disjoint_left]; grind
+    unfold Y'; rw [Finset.card_erase_of_mem hy]; omega; -- Once again, assuming I can use theorems from ch3 (or those related)
 
+
+#check finite_series_eq
+#check exist_bijection
 /-- Proposition 7.1.11(f) / Exercise 7.1.2 -/
 theorem finite_series_of_add {X':Type*} (f g: X' → ℝ) (X: Finset X') :
-    ∑ x ∈ X, (f + g) x = ∑ x ∈ X, f x + ∑ x ∈ X, g x := by sorry
+    ∑ x ∈ X, (f + g) x = ∑ x ∈ X, f x + ∑ x ∈ X, g x := by
+    choose s hs using exist_bijection X rfl
+    rw [finite_series_eq X (f+g) s hs, finite_series_eq X f s hs, finite_series_eq X g s hs];
+    rw [← finite_series_add]; congr; ext i; split_ifs with h <;> simp
 
 /-- Proposition 7.1.11(g) / Exercise 7.1.2 -/
 theorem finite_series_of_const_mul {X':Type*} (f: X' → ℝ) (X: Finset X') (c:ℝ) :
-    ∑ x ∈ X, c * f x = c * ∑ x ∈ X, f x := by sorry
+    ∑ x ∈ X, c * f x = c * ∑ x ∈ X, f x := by
+    choose s hs using exist_bijection X rfl
+    rw [finite_series_eq X f s hs, finite_series_eq X (fun i ↦ c * f i) s hs];
+    rw [← finite_series_const_mul]; simp;
 
 /-- Proposition 7.1.11(h) / Exercise 7.1.2 -/
 theorem finite_series_of_le' {X':Type*} (f g: X' → ℝ) (X: Finset X') (h: ∀ x ∈ X, f x ≤ g x) :
-    ∑ x ∈ X, f x ≤ ∑ x ∈ X, g x := by sorry
+    ∑ x ∈ X, f x ≤ ∑ x ∈ X, g x := by
+    choose s hs using exist_bijection X rfl
+    rw [finite_series_eq X f s hs, finite_series_eq X g s hs]
+    apply finite_series_of_le; intro i h1i hin; split_ifs with h'
+    apply h; exact (s ⟨i, h'⟩).prop; rfl
+
+
 
 /-- Proposition 7.1.11(i) / Exercise 7.1.2 -/
 theorem abs_finite_series_le' {X':Type*} (f: X' → ℝ) (X: Finset X') :
-    |∑ x ∈ X, f x| ≤ ∑ x ∈ X, |f x| := by sorry
+    |∑ x ∈ X, f x| ≤ ∑ x ∈ X, |f x| := by
+    choose s hs using exist_bijection X rfl
+    rw [finite_series_eq X f s hs, finite_series_eq X (fun i ↦ |f i|) s hs]
+    nth_rw 2 [show (0:ℝ) = |(0:ℝ)| by simp]; -- Extract || from our dite construction
+    conv=> arg 2; arg 2; intro i; rw [ ← apply_dite abs _ _]
+    let g: ℤ → ℝ := fun i ↦ if hi : i ∈ Icc 1 (#X :ℤ) then f ↑(s ⟨i, hi⟩) else 0
+    have := abs_finite_series_le g (m:= 1) (n:=#X);
+    apply this
 
 /-- Lemma 7.1.13 -/
 theorem finite_series_of_finite_series {XX YY:Type*} (X: Finset XX) (Y: Finset YY)
@@ -348,7 +455,9 @@ theorem finite_series_of_finite_series {XX YY:Type*} (X: Finset XX) (Y: Finset Y
     ∑ x ∈ X, ∑ y ∈ Y, f (x, y) = ∑ z ∈ X.product Y, f z := by
   generalize h: X.card = n
   revert X; induction' n with n hn
-  . sorry
+  · intro X hX; rw [card_eq_zero] at hX; subst hX;
+    simp only [product_eq_sprod, empty_product]; -- Previously proven that ∅ ×ˢ Y = ∅
+    rw [finite_series_of_empty, finite_series_of_empty];
   intro X hX
   have hnon : X.Nonempty := by grind [card_ne_zero]
   choose x₀ hx₀ using hnon.exists_mem
@@ -376,8 +485,10 @@ theorem finite_series_of_finite_series {XX YY:Type*} (X: Finset XX) (Y: Finset Y
       simp at hz ⊢; grind
     _ = _ := by
       symm; convert finite_series_of_disjoint_union _ _
-      . sorry
-      sorry
+      · rw [show X = X' ∪ {x₀} by grind];
+        simp only [Finset.product_eq_sprod]; rw [union_product];
+        ext i; simp [mem_product]
+      rw [disjoint_left]; intro z hz hz'; simp at hz hz'; grind
 
 /-- Corollary 7.1.14 (Fubini's theorem for finite series). -/
 theorem finite_series_refl {XX YY:Type*} (X: Finset XX) (Y: Finset YY) (f: XX × YY → ℝ) :
@@ -406,6 +517,14 @@ theorem finite_series_comm {XX YY:Type*} (X: Finset XX) (Y: Finset YY) (f: XX ×
 #check Nat.factorial_zero
 #check Nat.factorial_succ
 
+-- Skipping this section for time.
+
+
+
+
+#check finite_series_const_mul
+#check concat_finite_series
+
 /--
   Exercise 7.1.4. Note: there may be some technicalities passing back and forth between natural
   numbers and integers. Look into the tactics {tactic}`zify`, {tactic}`norm_cast`, and {tactic}`omega`
@@ -414,14 +533,152 @@ theorem binomial_theorem (x y:ℝ) (n:ℕ) :
     (x + y)^n
     = ∑ j ∈ Icc (0:ℤ) n,
     n.factorial / (j.toNat.factorial * (n-j).toNat.factorial) * x^j * y^(n - j) := by
-  sorry
+  induction' n with n hn
+  · simp  -- base case n = 0: (x+y)^0 = 1 = 0!/(0!*0!) * x^0 * y^0
+  let F (n:ℕ) :ℝ  := n.factorial
+  have hF_succ : ∀ n, F (n+1) = (n+1) * F n := by intro n; simp [F, Nat.factorial_succ]
+  let C : ℕ → ℤ → ℝ := fun m j ↦ (F m) / (F j.toNat * F (m-j).toNat)
+  let D : ℕ → ℤ → ℝ := fun m j ↦ x^j * y^(m - j) * (C m j)
+  convert_to _ = ∑ j ∈ Icc (0:ℤ) (n+1), D (n+1) j; congr; ext i; unfold D; unfold C; ring
+  replace hn : (x + y)^n = ∑ j ∈ Icc (0:ℤ) n, D n j := by convert hn using 1; congr; ext i; unfold D C; ring
+
+  rw [show (x + y)^(n+1) = (x+y)^n * (x+y) by ring]
+  rw [hn, mul_add, ];
+  nth_rw 1 [shift_finite_series (k:= 1)]; simp -- Left side
+  rw [sum_of_nonempty];
+  rw [← concat_finite_series (m:=0) (n:=0) (p:=n)]; any_goals try linarith
+  rw [sum_of_nonempty]; -- Right side
+  rw [← concat_finite_series (m:=0) (n:=0) (p:=n)]; any_goals try linarith
+  rw [add_mul, add_mul]; simp
+
+  convert_to D n 0 * y + ((∑ i ∈ Icc 1 ↑n, D n (i - 1)) * x + (∑ x ∈ Icc 1 ↑n, D n x) * y) + D n ↑n * x = _
+  ring; congr 1; congr 1
+  · unfold D C F; field_simp; norm_cast
+  swap
+  · unfold D C F; field_simp; norm_cast
+  rw [mul_comm,← finite_series_const_mul]
+  rw [mul_comm _ y, ← finite_series_const_mul]
+  rw [← finite_series_of_add];
+  apply sum_congr'; intro i hi1 hi2; simp;
+  obtain ⟨k, rfl⟩ : ∃ k:ℕ, i = k+1 := ⟨(i-1).toNat, by omega⟩
+  simp;
+
+  have hnk: (n:ℤ) - k = ((n - k : ℕ) : ℤ) := by omega
+  have hnk1: (n:ℤ) - (k+1) = ((n - k - 1 : ℕ) : ℤ) := by omega
+
+  have hx:= by calc
+    x * D n k = (x^k*x)*(y ^ (n - k)) * C n k := by unfold D; rw [hnk]; simp [zpow_natCast]; ring
+    _ = (x ^ (k+1))*(y ^ (n - k)) * C n k := by rw [pow_succ]
+  have hy:= by calc
+    y * D n (k + 1) = (x ^ (k+1))*(y ^ (n - k - 1)*y) * C n (k+1) := by unfold D; rw [hnk1]; norm_cast; ring
+    _ = (x ^ (k+1))*(y ^ (n - k)) * C n (k+1) := by rw [← pow_succ]; congr; omega -- omega seems good for type issues
+  rw [hx, hy]; unfold D
+  rw [← mul_add]; congr 1
+  · simp; rw [hnk]; norm_cast
+  unfold C; rw [hnk1]; simp
+  try polyrith
+  have : F (n - k) = F (n - k - 1) * ((n - k:ℕ) :ℝ) := by
+    unfold F; rw [← Nat.mul_factorial_pred (by linarith)]; simp; ring
+  repeat rw [hF_succ]
+  repeat rw [this]
+  have hnk0 : (n - k : ℕ) ≠ 0 := by omega
+  field_simp
+  have hnk': (n:ℝ) - k = ((n - k : ℕ) : ℝ) := by exact_mod_cast hnk
+  rw [← hnk']
+  ring
+
+
+
+theorem binomial_theorem' (x y:ℝ) (n:ℕ) :
+    (x + y)^n
+    = ∑ j ∈ Icc (0:ℤ) n,
+    n.factorial / (j.toNat.factorial * (n-j).toNat.factorial) * x^j * y^(n - j) := by
+  induction' n with n hn
+  · simp  -- base case n = 0: (x+y)^0 = 1 = 0!/(0!*0!) * x^0 * y^0
+  let F (n:ℕ) :ℝ  := n.factorial
+  have hF_succ : ∀ n, F (n+1) = (n+1) * F n := by intro n; simp [F, Nat.factorial_succ]
+  let C : ℕ → ℤ → ℝ := fun m j ↦ (F m) / (F j.toNat * F (m-j).toNat)
+  let D : ℕ → ℤ → ℝ := fun m j ↦ x^j * y^(m - j) * (C m j)
+  convert_to _ = ∑ j ∈ Icc (0:ℤ) (n+1), D (n+1) j; congr; ext i; unfold D; unfold C; ring
+  replace hn : (x + y)^n = ∑ j ∈ Icc (0:ℤ) n, D n j := by convert hn using 1; congr; ext i; unfold D C; ring
+
+  rw [show (x + y)^(n+1) = (x+y)^n * (x+y) by ring]
+  rw [hn, mul_add, ];
+  nth_rw 1 [shift_finite_series (k:= 1)]; simp -- Left side
+  rw [sum_of_nonempty];
+  rw [← concat_finite_series (m:=0) (n:=0) (p:=n)]; any_goals try linarith
+  rw [sum_of_nonempty]; -- Right side
+  rw [← concat_finite_series (m:=0) (n:=0) (p:=n)]; any_goals try linarith
+  rw [add_mul, add_mul]; simp
+
+  convert_to D n 0 * y + ((∑ i ∈ Icc 1 ↑n, D n (i - 1)) * x + (∑ x ∈ Icc 1 ↑n, D n x) * y) + D n ↑n * x = _
+  ring; congr 1; congr 1
+  · unfold D C F; field_simp; norm_cast
+  swap
+  · unfold D C F; field_simp; norm_cast
+  rw [mul_comm,← finite_series_const_mul]
+  rw [mul_comm _ y, ← finite_series_const_mul]
+  rw [← finite_series_of_add];
+  apply sum_congr'; intro i hi1 hi2; simp;
+  obtain ⟨k, rfl⟩ : ∃ k:ℕ, i = k+1 := ⟨(i-1).toNat, by omega⟩
+  simp;
+
+  have hnk: (n:ℤ) - k = ((n - k : ℕ) : ℤ) := by omega
+  have hnk1: (n:ℤ) - (k+1) = ((n - k - 1 : ℕ) : ℤ) := by omega
+
+  have hx:= by calc
+    x * D n k = (x^k*x)*(y ^ (n - k)) * C n k := by unfold D; rw [hnk]; simp [zpow_natCast]; ring
+    _ = (x ^ (k+1))*(y ^ (n - k)) * C n k := by rw [pow_succ]
+  have hy:= by calc
+    y * D n (k + 1) = (x ^ (k+1))*(y ^ (n - k - 1)*y) * C n (k+1) := by unfold D; rw [hnk1]; norm_cast; ring
+    _ = (x ^ (k+1))*(y ^ (n - k)) * C n (k+1) := by rw [← pow_succ]; congr; omega -- omega seems good for type issues
+  rw [hx, hy]; unfold D
+  rw [← mul_add]; congr 1
+  · simp; rw [hnk]; norm_cast
+  unfold C; rw [hnk1]; simp
+  try polyrith
+  have : F (n - k) = F (n - k - 1) * ((n - k:ℕ) :ℝ) := by
+    unfold F; rw [← Nat.mul_factorial_pred (by linarith)]; simp; ring
+  repeat rw [hF_succ]
+  repeat rw [this]
+  have hnk0 : (n - k : ℕ) ≠ 0 := by omega
+  field_simp
+  have hnk': (n:ℝ) - k = ((n - k : ℕ) : ℝ) := by exact_mod_cast hnk
+  rw [← hnk']
+  ring
+
+
+-- For this problem,You can't really induct over the type itself... because
+-- the inductive hypothesis would be over the index for a different type.
+-- Sum is being taken over a type, which under the hood is Finset.univ
+-- So, we'll induct over finsets instead: that way, we can use any set in the
+-- IH, not just univ.
 
 /-- Exercise 7.1.5 -/
 theorem lim_of_finite_series {X:Type*} [Fintype X] (a: X → ℕ → ℝ) (L : X → ℝ)
   (h: ∀ x, Filter.atTop.Tendsto (a x) (nhds (L x))) :
     Filter.atTop.Tendsto (fun n ↦ ∑ x, a x n) (nhds (∑ x, L x)) := by
-  sorry
+  generalize (Finset.univ : Finset X) = S
+  induction' S using Finset.induction_on with x S hx ih
+  · rw [Metric.tendsto_atTop]; intro e he; use 0; intro n hn
+    repeat rw [finite_series_of_empty];
+    simp only [dist_self, he]
+  rw [Finset.sum_insert hx] -- Justified use by finite_series_of_insert
+  conv => arg 1; intro n; rw [Finset.sum_insert hx]
+  exact (h x).add ih -- tendsTo_add equivalent from last chapter
 
+#check Finset.univ
+-- Explicit argument
+abbrev univ' (X:Type*) [Fintype X] : Finset X := Finset.univ
+
+
+-- Interesting note: by using `generalize`, I'm induction over the length
+-- of the index set, without actually going in order necessarily
+-- (i=0,1,2,3...n).
+-- I *could* induct on like, some m, while indexing Icc 1 m.
+-- But in Lean, that would be 'going against the grain' of the
+-- built-in machinery, which encourages you to generically induct
+-- over cardinality, rather than a precise ordering.
 /-- Exercise 7.1.6 -/
 theorem sum_union_disjoint {n : ℕ} {S : Type*} [Fintype S]
     (E : Fin n → Finset S)
@@ -429,12 +686,88 @@ theorem sum_union_disjoint {n : ℕ} {S : Type*} [Fintype S]
     (cover : ∀ s : S, ∃ i, s ∈ E i)
     (f : S → ℝ) :
     ∑ s, f s = ∑ i, ∑ s ∈ E i, f s := by
-  sorry
+  -- ∑ i is actually ∑ i ∈ (Finset.univ : Finset (Fin n))
+  -- ∑ s is actually ∑ s ∈ (Finset.univ : Finset S)
+  -- Informally, S = ⋃ i, E i
+  have : (Finset.univ : Finset S) = (Finset.univ : Finset (Fin n)).biUnion E := by
+    ext i; refine ⟨?_, by intro hi; exact mem_univ i⟩
+    intro _; rw [mem_biUnion]; choose k hk using cover i
+    use k; simp [hk]
+  revert this
+  generalize (Finset.univ : Finset S) = Z
+  generalize (Finset.univ : Finset (Fin n)) = I
+  induction' I using Finset.induction_on with i I hi ih generalizing Z
+  · rintro rfl; simp -- empty set on both sides
+  simp; rintro rfl
+  rw [finite_series_of_disjoint_union]
+  · rw [sum_insert hi] -- Allowing myself to use sum_insert. I've could just rearranged to use finite_series_of_insert
+    simp [ih _ rfl]
+  rw [disjoint_right]; intro x hx
+  simp at hx; choose j hj1 hj2 using hx;
+  specialize disj i j (by grind)
+  exact Disjoint.notMem_of_mem_left_finset ((Disjoint.symm disj)) hj2
+
+
+#check Finset.sum_boole
+#check exist_bijection
+
+
+
+
+theorem finite_series_comm' {XX YY:Type*} (X: Finset XX) (Y: Finset YY) (f: XX × YY → ℕ) :
+  ∑ x ∈ X, ∑ y ∈ Y, f (x, y) = ∑ y ∈ Y, ∑ x ∈ X, f (x, y) := by
+  exact_mod_cast finite_series_comm X Y (fun z ↦ (f z :ℝ )) -- Coercion
+
+theorem finite_series_of_disjoint_union' {Z:Type*} {X Y: Finset Z} (hdisj: Disjoint X Y) (f: Z → ℕ) :
+    ∑ z ∈ X ∪ Y, f z = ∑ z ∈ X, f z + ∑ z ∈ Y, f z := by
+    exact_mod_cast finite_series_of_disjoint_union hdisj (fun z ↦ (f z :ℝ )) -- Coercion
+
+/-
+Finset.sum_congr.{u_1, u_4} {ι : Type u_1} {M : Type u_4} {s₁ s₂ : Finset ι} [AddCommMonoid M] {f g : ι → M}
+  (h : s₁ = s₂) : (∀ x ∈ s₂, f x = g x) → s₁.sum f = s₂.sum g
+-/
+lemma sum_const' {ι : Type u_1} {M : Type u_4} {s : Finset ι} [AddCommMonoid M] (b : M) :
+  ∑ _x ∈ s, b = #s • b := by
+  induction' s using Finset.induction_on with a s has ih
+  · simp
+  rw [sum_insert has]; rw [ih]; rw [card_insert_of_notMem has];
+  symm; apply succ_nsmul'
+
+lemma sum_boole' {ι : Type u_1} (p : ι → Prop) [DecidablePred p]
+  (s : Finset ι) : (∑ x ∈ s, if p x then 1 else 0) = (#({x ∈ s | p x})) := by
+  have : s = {x ∈ s | p x} ∪ s.filter (fun x ↦ ¬ p x) := by
+    ext i; simp [Finset.mem_filter]; tauto
+
+  nth_rw 1 [this];
+  rw [finite_series_of_disjoint_union' (by rw [disjoint_left]; simp; grind)] -- sum_union is just type-generic finite_series_of_disjoint_union
+  rw [← add_zero #({x ∈ s | p x})]
+  congr 1
+  · rw [Finset.sum_congr rfl (g:= fun i ↦ 1)] -- We've already made sum_congr'. This would just be over sets instead of Icc. Who cares
+    rw [sum_const']; simp
+    · intro x hx; simp at hx; simp [hx]
+  apply Finset.sum_eq_zero
+  intro x hx
+  simp only [Finset.mem_filter] at hx
+  simp [hx.2]
+
+
+lemma nat_eq_sum_lt (m n:ℕ) (h: n ≤ m) :
+    n = ∑ j : Fin m, if n > j then 1 else 0 := by
+  rw [Fin.sum_univ_eq_sum_range (fun j => if n > j then 1 else 0),
+      Finset.sum_boole']
+  simp; rw [← Finset.card_range n]
+  congr; ext i; simp [Finset.mem_filter]; grind
+
 
 /-- {given}`aᵢ` Exercise 7.1.7. Uses {lean}`Fin m` (so {lean}`aᵢ < m`) instead of the book's {lean}`aᵢ ≤ m`;
   the bound is baked into the type, and {kw (of := «term_<_»)}`<` replaces {kw (of := «term_≤_»)}`≤` to match the 0-indexed shift. -/
 theorem sum_finite_col_row_counts {n m : ℕ} (a : Fin n → Fin m) :
     ∑ i, (a i : ℕ) = ∑ j : Fin m, {i : Fin n | j < a i}.toFinset.card := by
-  sorry
+  simp [Set.toFinset_setOf]
+  conv => lhs; arg 2; intro i; rw [nat_eq_sum_lt (n := a i ) (m:=m) (by grind)]
+  rw [finite_series_comm' Finset.univ Finset.univ
+      (fun p ↦ if (a p.1 : ℕ) > ((p.2:Fin m) : ℕ) then 1 else 0)]
+  congr; ext j; simp only [Fin.val_fin_lt]
+  simp only [sum_boole']
 
 end Finset
