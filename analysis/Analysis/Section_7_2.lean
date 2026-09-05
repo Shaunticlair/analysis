@@ -382,7 +382,7 @@ theorem Series.example_7_2_13a : example_7_2_13.converges := by
 
   conv at this => arg 1; arg 1; arg 1; simp [-one_div, mul_one_div]
   apply this.mpr
-  have : Nonempty { n:ℤ // n ≥ 1 } := ⟨1, by grind⟩
+  letI : Nonempty { n:ℤ // n ≥ 1 } := ⟨1, by grind⟩
   rw [Metric.tendsto_atTop]; intro e he; choose N hN using exists_nat_gt (1/e);
   use ⟨N+1, by grind⟩; intro n hn; simp [-one_div]
   have := n.prop
@@ -396,17 +396,35 @@ theorem Series.example_7_2_13a : example_7_2_13.converges := by
   lift z to ℕ using (by omega)
   simp; linarith
 
+
 -- Using Lean's built-in theorem, because they explicitly reference a later
 -- chapter for the proof, so I presume I shouldn't prove it here.
 -- This requires an additional import, but I don't really know what else you want from me.
 
-#check Real.summable_one_div_nat_pow
+-- Strongly labelled as "convergence of the harmonic series"
+#check Real.tendsto_sum_range_one_div_nat_succ_atTop
+-- The above only says it diverges to ∞. If we want that to mean "doesn't converge", we use this theorem:
+#check not_tendsto_nhds_of_tendsto_atTop
+
+-- Credit to GPT 5.6 Sol and 6 Astra for finding the theorems I need. Didn't use it to write the thm, though
 
 theorem Series.example_7_2_13b : ¬ example_7_2_13.absConverges := by
-  sorry
+  unfold absConverges converges convergesTo; push_neg
+  apply not_tendsto_nhds_of_tendsto_atTop -- Diverges to ∞
+  -- Problem: we're using ℤ, but thm is stated for ℕ
+  rw [← Nat.map_cast_int_atTop,   -- We precomp atTop ℤ with atTop ℕ
+        Filter.tendsto_map'_iff]  -- We move the composition inside the function: use Nat.cast
+  convert Real.tendsto_sum_range_one_div_nat_succ_atTop with j -- Now, we can compare directly
+  -- It's easier to do induction than try to manipulate the differently-indexed sums
+  induction' j with j ih
+  · simp [Series.partial]
+  simp_all; rw [partial_succ _ (by simp), Finset.sum_range_succ] -- split off extra term
+  rw [ih]; congr
+  simp [abs_div, zpow_add₀, abs_pow]; finiteness -- Cleanup: canceling the abs and (-1)^n term
 
-theorem Series.example_7_2_13c :  example_7_2_13.condConverges := by
-  sorry
+
+
+theorem Series.example_7_2_13c :  example_7_2_13.condConverges :=  ⟨example_7_2_13a,Series.example_7_2_13b⟩
 
 instance Series.inst_add : Add Series where
   add a b := {
@@ -422,6 +440,7 @@ theorem Series.add_coe (a b: ℕ → ℝ) : (a:Series) + (b:Series) = (fun n ↦
 /-- Proposition 7.2.14 (a) (Series laws) / Exercise 7.2.5.  The `convergesTo` form can be more convenient for applications. -/
 theorem Series.convergesTo.add {s t:Series} {L M: ℝ} (hs: s.convergesTo L) (ht: t.convergesTo M) :
     (s + t).convergesTo (L + M) := by
+  unfold convergesTo;
   sorry
 
 theorem Series.add {s t:Series} (hs: s.converges) (ht: t.converges) :
