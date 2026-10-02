@@ -3,6 +3,8 @@ import Analysis.Section_6_4
 import Analysis.Section_7_4
 import Mathlib.Topology.Instances.EReal.Lemmas
 import Mathlib.Analysis.SpecialFunctions.Pow.Continuity
+import Mathlib.Analysis.SpecialFunctions.Pow.Asymptotics
+import Mathlib.Order.LiminfLimsup
 
 /-!
 # Analysis I, Section 7.5: The root and ratio tests
@@ -20,6 +22,10 @@ A point that is only implicitly stated in the text is that for the root and rati
 namespace Chapter7
 
 open Filter Real EReal
+
+#check Filter.limsup
+#check Filter.atTop
+--#check atTop
 
 /-- Theorem 7.5.1(a) (Root test).  A technical condition is needed to ensure the limsup is finite. -/
 theorem Series.root_test_pos {s : Series}

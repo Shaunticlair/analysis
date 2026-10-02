@@ -60,6 +60,7 @@ theorem Series.partial_succ (s : Series) {N:ℤ} (h: N ≥ s.m-1) : s.partial (N
   convert Finset.sum_insert (show N+1 ∉ Finset.Icc s.m N by simp)
   symm; apply Finset.insert_Icc_right_eq_Icc_add_one; linarith
 
+
 theorem Series.partial_of_lt {s : Series} {N:ℤ} (h: N < s.m) : s.partial N = 0 := by
   unfold Series.partial
   rw [Finset.sum_eq_zero]
@@ -392,7 +393,7 @@ theorem Series.example_7_2_13a : example_7_2_13.converges := by
   simp at hn
   rw [one_div_lt (by rw [abs_of_pos (by simp;omega)];simp; omega) he]
   apply lt_trans hN
-  rw [abs_of_pos (by finiteness)]
+  rw [abs_of_pos (by positivity)]
   lift z to ℕ using (by omega)
   simp; linarith
 
@@ -420,97 +421,267 @@ theorem Series.example_7_2_13b : ¬ example_7_2_13.absConverges := by
   · simp [Series.partial]
   simp_all; rw [partial_succ _ (by simp), Finset.sum_range_succ] -- split off extra term
   rw [ih]; congr
-  simp [abs_div, zpow_add₀, abs_pow]; finiteness -- Cleanup: canceling the abs and (-1)^n term
-
+  simp [abs_div, zpow_add₀, abs_pow]; positivity -- Cleanup: canceling the abs and (-1)^n term
 
 
 theorem Series.example_7_2_13c :  example_7_2_13.condConverges :=  ⟨example_7_2_13a,Series.example_7_2_13b⟩
 
 instance Series.inst_add : Add Series where
   add a b := {
-    m := max a.m b.m
-    seq n := if n ≥ max a.m b.m then a.seq n + b.seq n else 0
-    vanish n hn := by rw [lt_iff_not_ge] at hn; simp [hn]
+    m := min a.m b.m
+    seq n := a.seq n + b.seq n
+    vanish n hn := by simp [a.vanish n (by omega), b.vanish n (by omega)]
   }
 
 theorem Series.add_coe (a b: ℕ → ℝ) : (a:Series) + (b:Series) = (fun n ↦ a n + b n) := by
   ext n; rfl
-  by_cases h:n ≥ 0 <;> simp [h, HAdd.hAdd, Add.add]
+  change (a:Series).seq n + (b:Series).seq n = _
+  by_cases h:n ≥ 0 <;> simp [h]
+
+/-
+Filter.Tendsto.add: adds two limits. Here, Filter.Tendsto.add hs ht gives convergence of fun N ↦ s.partial N + t.partial N to L + M.
+Finset.sum_add_distrib: rewrites a finite sum of s.seq n + t.seq n as the sum of the two finite sums.
+Finset.sum_subset: extends a summation interval when all added terms are zero. Use your project’s Series.vanish to align the lower endpoints.
+-/
+#check Filter.Tendsto.add
+#check Finset.sum_add_distrib
+#check Finset.sum_subset
+
+abbrev Series.start_early (s: Series) (m': ℤ) (hm' : m' ≤ s.m) : Series :=
+  { m := m'
+    seq n := s.seq n
+    vanish n hn := by simp [s.vanish n (by omega)] }
+
+
+
+#check Finset.sum_subset -- Retrieved by GPT, allows us to ignore 0 terms
+
+lemma Series.convergesTo_early {s: Series} (m': ℤ) (hm' : m' ≤ s.m) (L: ℝ):
+  (s.start_early m' hm').convergesTo L ↔ s.convergesTo L := by
+  constructor <;> intro hs <;>
+  unfold Series.convergesTo at * <;> convert hs using 1 <;>
+  unfold Series.partial <;> ext i <;> simp <;>
+  [apply Finset.sum_subset; (symm; apply Finset.sum_subset)]
+  any_goals apply Finset.Icc_subset_Icc_left hm'
+  all_goals (intro j hj1 hj2; simp_all; apply s.vanish; omega)
 
 /-- Proposition 7.2.14 (a) (Series laws) / Exercise 7.2.5.  The `convergesTo` form can be more convenient for applications. -/
 theorem Series.convergesTo.add {s t:Series} {L M: ℝ} (hs: s.convergesTo L) (ht: t.convergesTo M) :
     (s + t).convergesTo (L + M) := by
-  unfold convergesTo;
-  sorry
+  have hs' := (Series.convergesTo_early (min s.m t.m) (by omega) _).mpr hs
+  have ht' := (Series.convergesTo_early (min s.m t.m) (by omega) _).mpr ht
+  rw [← Series.convergesTo_early (min s.m t.m) (by rfl) _]
+  have := Filter.Tendsto.add hs' ht'
+  convert this with i
+  simp [Series.partial];
+  rw [← Finset.sum_add_distrib]; congr
+
+
+#check Series.sum_of_converges
 
 theorem Series.add {s t:Series} (hs: s.converges) (ht: t.converges) :
-    (s + t).converges ∧ (s+t).sum = s.sum + t.sum := by sorry
+    (s + t).converges ∧ (s+t).sum = s.sum + t.sum := by
+  choose S hS using hs
+  choose T hT using ht
+  have := Series.convergesTo.add hS hT
+  refine ⟨converges_of_convergesTo this, ?_⟩
+  repeat rw [sum_of_converges]
+  apply this; apply hT; apply hS
 
 instance Series.inst.smul : SMul ℝ Series where
   smul c s := {
     m := s.m
-    seq n := if n ≥ s.m then c * s.seq n else 0
-    vanish := by grind
+    seq n := c * s.seq n
+    vanish := by intro n hn; rw [s.vanish n hn]; simp
   }
 
 theorem Series.smul_coe (a: ℕ → ℝ) (c: ℝ) : (c • a:Series) = (fun n ↦ c * a n) := by
   ext n; rfl
   by_cases h:n ≥ 0 <;> simp [h, HSMul.hSMul, SMul.smul]
 
+
 /-- Proposition 7.2.14 (b) (Series laws) / Exercise 7.2.5.  The `convergesTo` form can be more convenient for applications. -/
 theorem Series.convergesTo.smul {s:Series} {L c: ℝ} (hs: s.convergesTo L) :
     (c • s).convergesTo (c * L) := by
-  sorry
+  convert hs.const_mul c using 1 -- We use the const_mul thm for limits (written as tendsTo)
+  simp [Series.partial]; ext i
+  rw [Finset.mul_sum] -- const_mul thm for sums
+  simp [Series.partial, HSMul.hSMul, SMul.smul] -- Unpack generic • and also same-type •
 
 theorem Series.smul {c:ℝ} {s:Series} (hs: s.converges) :
-    (c • s).converges ∧ (c • s).sum = c * s.sum := by sorry
+    (c • s).converges ∧ (c • s).sum = c * s.sum := by
+    choose S hS using hs
+    have := Series.convergesTo.smul hS (c:=c)
+    refine ⟨converges_of_convergesTo this, ?_⟩
+    repeat rw [Series.sum_of_converges]
+    apply this; apply hS
 
 /-- The corresponding API for subtraction was not in the textbook, but is useful in later sections, so is included here. -/
 instance Series.inst_sub : Sub Series where
   sub a b := {
-    m := max a.m b.m
-    seq n := if n ≥ max a.m b.m then a.seq n - b.seq n else 0
-    vanish := by grind
+    m := min a.m b.m
+    seq n := a.seq n - b.seq n
+    vanish n hn := by simp [a.vanish n (by omega), b.vanish n (by omega)]
   }
 
 theorem Series.sub_coe (a b: ℕ → ℝ) : (a:Series) - (b:Series) = (fun n ↦ a n - b n) := by
   ext n; rfl
   by_cases h:n ≥ 0 <;> simp [h, HSub.hSub, Sub.sub]
 
+theorem Series.sub_eq_add_neg_smul (a b : Series) :
+    a - b = a + (-1 : ℝ) • b := by
+  ext n; rfl;
+  simp [HSub.hSub, Sub.sub, HAdd.hAdd, Add.add,
+    HSMul.hSMul, SMul.smul] -- Unpack all of the defs to convert the sequences to their canonical forms
+
 theorem Series.convergesTo.sub {s t:Series} {L M: ℝ} (hs: s.convergesTo L) (ht: t.convergesTo M) :
     (s - t).convergesTo (L - M) := by
-  sorry
+  rw [Series.sub_eq_add_neg_smul, sub_eq_add_neg]
+  apply Series.convergesTo.add hs;
+  rw [neg_eq_neg_one_mul M]
+  apply Series.convergesTo.smul ht
 
 theorem Series.sub {s t:Series} (hs: s.converges) (ht: t.converges) :
-    (s - t).converges ∧ (s-t).sum = s.sum - t.sum := by sorry
+    (s - t).converges ∧ (s-t).sum = s.sum - t.sum := by
+  choose S hS using hs
+  choose T hT using ht
+  have := Series.convergesTo.sub hS hT
+  refine ⟨converges_of_convergesTo this, ?_⟩
+  repeat rw [Series.sum_of_converges]
+  apply this; apply hT; apply hS
 
 abbrev Series.from (s:Series) (m₁:ℤ) : Series := mk' (m := max s.m m₁) (fun n ↦ s.seq (n:ℤ))
 
+
+
+#check Finset.sum_union
+#check Finset.sum_congr
+#check Filter.eventually_ge_atTop
+#check Filter.Tendsto.congr'
+#check Filter.Tendsto.sub_const
+#check Filter.Tendsto.const_add
+
+
+-- GPT introduced me to a few theorems as well as `filter_upwards`.
+-- `filter_upwards` seems to be useful for taking everything at a "high enough" index.
+-- i.e., you can use assumptions that are only "eventually" true, and reason normally over them.
+
+theorem Series.convergesTo_from (s:Series) (k:ℕ) (S:ℝ) :
+  s.convergesTo (S+∑ n ∈ Finset.Ico s.m (s.m+k), s.seq n) ↔ (s.from (s.m + k)).convergesTo (S) := by
+  set C := ∑ n ∈ Finset.Ico s.m (s.m + k), s.seq n
+  -- The ability to split off the finite prefix will be needed in both directions, so we lemma it
+  have hpartial : ∀ N ≥ s.m + k, s.partial N = C + (s.from (s.m + k)).partial N := by
+    -- Could've done with induction, but dealing with Ico and Icc directly is actually *more* annoying
+    intro n hn; unfold C; simp [Series.partial];
+    nth_rw 3 [Finset.sum_congr (g:= (s.seq ·) ) rfl (by intro n; simp_all)]
+    rw [← Finset.sum_union (by simp [Finset.disjoint_left]; intros; linarith)]
+    apply Finset.sum_congr (by ext i;simp; grind) (by grind)
+  unfold convergesTo; constructor <;> intro h
+  · rw [show S = (S + C) - C by ring]
+    apply (h.sub_const C).congr' -- Eventually, sum - C is equal to sum.from
+    -- We have to use congr' (eventually-equal) because the equality only holds once the full presequence up to s.m+k is past
+    filter_upwards [Filter.eventually_ge_atTop (s.m + k)] with N hN -- They're equal once you're past s.m+k
+    rw [hpartial N hN]; ring
+  apply (h.add_const C).congr'
+  filter_upwards [Filter.eventually_ge_atTop (s.m + k)] with N hN
+  rw [hpartial N hN]; ring
+
 /-- Proposition 7.2.14 (c) (Series laws) / Exercise 7.2.5 -/
 theorem Series.converges_from (s:Series) (k:ℕ) : s.converges ↔ (s.from (s.m+k)).converges := by
-  sorry
+  let C := ∑ n ∈ Finset.Ico s.m (s.m + k), s.seq n
+  constructor <;> intro ⟨S,hS⟩
+  · use S - C
+    rw [show S = (S-C)+C by ring] at hS
+    rwa [Series.convergesTo_from] at hS
+  · use S + C; rwa [Series.convergesTo_from]
 
 theorem Series.sum_from {s:Series} (k:ℕ) (h: s.converges) :
     s.sum = ∑ n ∈ Finset.Ico s.m (s.m+k), s.seq n + (s.from (s.m+k)).sum := by
-  sorry
+  set C := ∑ n ∈ Finset.Ico s.m (s.m + k), s.seq n
+  choose S hS using h
+  rw [sum_of_converges hS]
+  rw [show S = S - C + C by ring] at hS
+  rw [Series.convergesTo_from] at hS
+  rw [sum_of_converges hS]; ring
+
+
+lemma Filter'.Tendsto.add_const_right {f : ℤ → ℝ} {x : ℝ}
+    (h : Filter.Tendsto f Filter.atTop (nhds x)) (L : ℤ) :
+    Filter.Tendsto (fun n ↦ f (n + L)) Filter.atTop (nhds x) :=
+  h.comp (Filter.tendsto_atTop_add_const_right Filter.atTop (L) Filter.tendsto_id)
+
+lemma Filter'.Tendsto.sub_const_right {f : ℤ → ℝ} {x : ℝ}
+    (h : Filter.Tendsto f Filter.atTop (nhds x)) (L : ℤ) :
+    Filter.Tendsto (fun n ↦ f (n - L)) Filter.atTop (nhds x) := by
+  simpa only [sub_eq_add_neg] using
+    Filter'.Tendsto.add_const_right h (-L)
+
+#check Finset.sum_map
+#check Finset.sum_bij
+#check Finset.map
 
 /-- Proposition 7.2.14 (d) (Series laws) / Exercise 7.2.5 -/
-theorem Series.shift {s:Series} {x:ℝ} (h: s.convergesTo x) (L:ℤ) :
-    (mk' (m := s.m + L) (fun n ↦ s.seq (n - L))).convergesTo x := by
-  sorry
+theorem Series.shift {s:Series} {x:ℝ} (h: s.convergesTo x) (k:ℤ) :
+    (mk' (m := s.m + k) (fun n ↦ s.seq (n - k))).convergesTo x := by
+  unfold convergesTo Series.partial at *
+  have := Filter'.Tendsto.sub_const_right h (k)
+  convert this using 2 with N
+  simp
+  -- I could use shift_finite_series from 7.1, but in order to get better at Lean,
+  -- I'l use a mathlib version (especially since we weren't given 7.1 as an import)
+  -- Not gonna use induction because that was annoying to begin with (not hard, just annoying)
+  -- Bijection is spiritually what induction does anyway
+  -- It's just that ℕ allows you to go one-by-one with induction to get information of the bijection
+  apply Finset.sum_bij (i := fun n hn ↦ n - k)
+    (hi :=by intro z h; simp at h ⊢; omega)
+    (h := by simp; intros; linarith)
+  · intros; simp_all
+  simp; intro y; intros; use y+k; simp; omega;
+
+  -- Alternative: could've used Finset.sum_map and addRightEmbedding k
+
+
+lemma Series.telescope' {a:ℕ → ℝ} (ha: Filter.atTop.Tendsto a (nhds 0)) (N:ℕ) :
+  ((fun n:ℕ ↦ a n - a (n+1)):Series).partial N = a 0 - a (N+1) := by
+  simp
+  induction' N with N ih
+  · simp [Series.partial]
+  push_cast
+  rw [Series.partial_succ _ (by simp)]
+  simp [ih]; rw [if_pos (by grind)]
+  simp
+
 
 /-- Lemma 7.2.15 (telescoping series) / Exercise 7.2.6 -/
 theorem Series.telescope {a:ℕ → ℝ} (ha: Filter.atTop.Tendsto a (nhds 0)) :
-    ((fun n:ℕ ↦ a (n+1) - a n):Series).convergesTo (a 0) := by
-  sorry
+    ((fun n:ℕ ↦ a n - a (n+1) ):Series).convergesTo (a 0) := by
+  unfold convergesTo; have h:= Series.telescope' ha
+  rw [Metric.tendsto_atTop] at *;
+  peel ha with e he ha; choose N ha using ha;
+  use N; intro n hn
+  lift n to ℕ using (by omega)
+  rw [h]; specialize ha (n+1) (by omega)
+  convert ha using 1; simp
 
 /- Exercise 7.2.1  -/
 
 def Series.exercise_7_2_1_convergent :
   Decidable ( (mk' (m := 1) (fun n ↦ (-1:ℝ)^(n:ℤ))).converges ) := by
   -- The first line of this proof should be `apply isTrue` or `apply isFalse`.
-  apply isFalse
-  sorry
+  apply isFalse; intro ⟨S, hS⟩;
+  unfold convergesTo at hS;
+  apply Filter.Tendsto.cauchySeq at hS
+  rw [Metric.cauchySeq_iff] at hS
+  choose N hN using hS 1 (by norm_num)
+  let M := |N|
+  have hM: 2 * M ≥ N := by linarith [le_abs_self N, abs_nonneg N]
+  specialize hN (2*M+1) (by linarith) (2*M) hM
+  simp [dist] at hN
+  rw [partial_succ] at hN; simp at hN
+  contrapose! hN;
+  rw [if_pos (abs_nonneg _)]
+  simp [← Real.norm_eq_abs, norm_zpow] -- abs_zpow didn't seem to exist yet in this mathlib ver
+  simp; aesop
 
 
 end Chapter7

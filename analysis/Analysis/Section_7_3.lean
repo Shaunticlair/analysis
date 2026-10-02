@@ -22,15 +22,36 @@ namespace Chapter7
 
 open Real
 
+#check Series.partial_succ
+#check Series.partial_of_lt
+#check Series.converges_of_convergesTo
+
+#check sum_of_nonempty
+#check concat_finite_series
+
+#check Series.converges_iff_tail_decay
+#check Series.decay_of_converges
+#check Series.converges_of_absConverges
+
 abbrev Series.nonneg (s: Series) : Prop := ∀ n, s.seq n ≥ 0
 
-abbrev Series.partial_of_nonneg {s: Series} (h: s.nonneg) : Monotone s.partial := by sorry
+lemma Series.partial_of_nonneg {s: Series} (h: s.nonneg) : Monotone s.partial := by
+  intro a b hab;
+  obtain ⟨r, rfl⟩ : ∃ (r:ℕ), b = a + r := ⟨(b-a).toNat, by omega⟩
+  induction' r with r ih
+  · simp
+  by_cases hsm : a + r + 1 ≥ s.m; swap
+  · rw [partial_of_lt (by omega), partial_of_lt (by omega)]
+  simp; rw [← add_assoc]
+  apply (ih (by omega)).trans
+  rw [partial_succ _  (by omega)]
+  simp; apply h
 
 /-- Proposition 7.3.1 -/
 theorem Series.converges_of_nonneg_iff {s: Series} (h: s.nonneg) : s.converges ↔ ∃ M, ∀ N, s.partial N ≤ M := by
   -- This broadly follows the argument in the text, though for one direction I choose to use Mathlib routines rather than Chapter6 results.
   constructor
-  . intro hconv
+  · intro hconv -- Use bounded_of_convergent
     set S : Chapter6.Sequence := ⟨ s.m, s.partial, by intro n hn; simp [Series.partial, hn] ⟩
     have : S.IsBounded := by
       apply S.bounded_of_convergent
@@ -39,44 +60,114 @@ theorem Series.converges_of_nonneg_iff {s: Series} (h: s.nonneg) : s.converges �
     choose M hpos hM using this
     use M; peel hM with N hM
     exact (le_abs_self _).trans hM
-  intro hbound
+  intro hbound -- Monotone tends to ∞, or to a value
   obtain hinfin | hfin := tendsto_of_monotone (partial_of_nonneg h)
   . choose M hM using hbound
-    choose N hN using (hinfin.eventually_gt_atTop M).exists
+    choose N hN using (hinfin.eventually_gt_atTop M).exists -- Eventually exceeds M
     grind
   assumption
 
+
 theorem Series.sum_of_nonneg_lt {s: Series} (h: s.nonneg) {M:ℝ} (hM: ∀ N, s.partial N ≤ M) : s.sum ≤ M := by
-  have : ∃ M, ∀ N, s.partial N ≤ M  := by use M
-  rw [←converges_of_nonneg_iff h] at this; simp [sum, this]
-  have hconv := this.choose_spec; simp [convergesTo] at hconv; exact le_of_tendsto' hconv hM
+  have : ∃ M, ∀ N, s.partial N ≤ M  := by use M -- bounded means convergence
+  rw [←converges_of_nonneg_iff h] at this; simp [sum, this] -- converges to s.sum
+  have hconv := this.choose_spec; simp [convergesTo] at hconv; -- reframe in mathlib terms
+  exact le_of_tendsto' hconv hM -- An upper bound for all terms is an upper bound for the limit
 
 theorem Series.partial_le_sum_of_nonneg {s: Series} (hnon: s.nonneg) (hconv: s.converges) (N : ℤ) :
   s.partial N ≤ s.sum := by
-  apply (partial_of_nonneg hnon).ge_of_tendsto
+  apply (partial_of_nonneg hnon).ge_of_tendsto -- If monotone and convergent, limit bounds above
   simp [sum, hconv]; exact hconv.choose_spec
 
 /-- Some useful nonnegativity lemmas for later applications. -/
 theorem Series.partial_nonneg {s: Series} (hnon: s.nonneg) (N : ℤ) : 0 ≤ s.partial N := by
-  simp [Series.partial]; apply Finset.sum_nonneg; aesop
+  simp [Series.partial]; apply Finset.sum_nonneg; aesop -- Known theorem, nice
 
 theorem Series.sum_of_nonneg {s:Series} (hnon: s.nonneg) : 0 ≤ s.sum := by
   by_cases h: s.converges <;> simp [Series.sum, h]
-  exact ge_of_tendsto' h.choose_spec (partial_nonneg hnon)
+  exact ge_of_tendsto' h.choose_spec (partial_nonneg hnon) -- Sum upper-bounds nonneg partials
+
+#check Finset.sum_le_sum -- Suggested by GPT astra
+
+lemma Series.seq_mono_seq {s t : Series} (hm: s.m = t.m) (hst: ∀ n ≥ s.m, s.seq n ≤ t.seq n): ∀ N, s.partial N ≤ t.partial N := by
+  intro N; unfold Series.partial; rw [hm]
+  apply Finset.sum_le_sum;
+  intro n hn; simp [← hm] at hn
+  apply hst; apply hn.1
 
 /-- Corollary 7.3.2 (Comparison test) / Exercise 7.3.1 -/
-theorem Series.converges_of_le {s t: Series} (hm: s.m = t.m) (hcomp: ∀ n ≥ s.m, |s.seq n| ≤ t.seq n) (hconv : t.converges) : s.absConverges ∧ |s.sum| ≤ s.abs.sum ∧ s.abs.sum ≤ t.sum := by sorry
+theorem Series.converges_of_le {s t: Series} (hm: s.m = t.m)
+(hcomp: ∀ n ≥ s.m, |s.seq n| ≤ t.seq n) (hconv : t.converges) :
+s.absConverges ∧ |s.sum| ≤ s.abs.sum ∧ s.abs.sum ≤ t.sum := by
+  have ht : t.nonneg := by
+    intro n; by_cases hn : n ≥ t.m; swap; simp_all [t.vanish]
+    apply le_trans _ (hcomp n (by omega)); apply abs_nonneg
+  have hpartial : ∀ N, s.abs.partial N ≤ t.partial N := by
+    apply Series.seq_mono_seq (by simp_all)
+    intro n hn; simp_all
+  have : s.absConverges := by
+    unfold absConverges abs
+    rw [converges_of_nonneg_iff ht] at hconv;
+    rw [converges_of_nonneg_iff (by intro n; simp; split_ifs <;> simp)]
+    peel hconv with M N h; apply le_trans _ h; convert hpartial N
+  refine ⟨this, Series.abs_le' this, ?_⟩
+  -- Lims ≤ if terms are ≤
+  apply le_of_tendsto_of_tendsto'
+    (s.abs.convergesTo_sum this) (t.convergesTo_sum hconv) -- Trying out using the x.theorem notation
+    hpartial
 
-theorem Series.diverges_of_ge {s t: Series} (hm: s.m = t.m) (hcomp: ∀ n ≥ s.m, |s.seq n| ≤ t.seq n) (hdiv: ¬ s.absConverges) : t.diverges := by sorry
+-- Contrapositive
+theorem Series.diverges_of_ge {s t: Series} (hm: s.m = t.m) (hcomp: ∀ n ≥ s.m, |s.seq n| ≤ t.seq n)
+(hdiv: ¬ s.absConverges) : t.diverges := by
+  unfold diverges; contrapose! hdiv; apply Series.converges_of_le hm hcomp at hdiv; grind
+
+-- Int version of the theorem
+-- Allowed astra to write this because tbh this is tedious type garbage
+lemma tendsto_pow_atTop_nhds_zero_of_abs_lt_one_INT {x : ℝ} (hx : |x| < 1) :
+    Filter.Tendsto (fun n : ℤ ↦ x ^ n) Filter.atTop (nhds 0) := by
+  rw [← Nat.map_cast_int_atTop, Filter.tendsto_map'_iff] -- Reindex the integer limit by naturals.
+  simpa only [Function.comp_def, zpow_natCast] using
+    tendsto_pow_atTop_nhds_zero_of_abs_lt_one hx -- Identify integer powers at natural exponents.
+
+-- astra helped me find the mathlib theorems I wanted, and convert between ℕ and ℤ
 
 /-- Lemma 7.3.3 (Geometric series) / Exercise 7.3.2 -/
-theorem Series.converges_geom {x: ℝ} (hx: |x| < 1) : (fun n ↦ x ^ n : Series).convergesTo (1 / (1 - x)) := by sorry
+theorem Series.converges_geom {x: ℝ} (hx: |x| < 1) : (fun n ↦ x ^ n : Series).convergesTo (1 / (1 - x)) := by
+  have h0 : 1 - x ≠ 0 := by intro h; simp_all [show x=1 by grind]
+  unfold convergesTo -- x^n thm is defined in naturals:
+  rw [← Nat.map_cast_int_atTop, Filter.tendsto_map'_iff] -- ℕ → ∞ and ℤ → ∞ are eventually the same.
+  suffices (fun (n:ℕ) ↦ (fun k ↦ x ^ k : Series).partial n) =
+           (fun (n:ℕ) ↦ (1 - x ^ (n + 1)) / (1 - x)) by
+    simp only [Function.comp_def];rw [this] -- Shwoing that this finite sum formula converges to 1/(1-x)
+    apply Filter.Tendsto.div_const; nth_rw 2 [show (1:ℝ) = 1 - 0 by ring] -- Common denom remove
+    apply Filter.Tendsto.const_sub (1 : ℝ) -- Of 1-a form, converge with a
+    have h1 := tendsto_pow_atTop_nhds_zero_of_abs_lt_one hx -- Lean thm for x^n --> 0
+    rwa [← Filter.tendsto_add_atTop_iff_nat 1] at h1 -- We want x^(n+1) rather than x^n
+  ext n; simp
+  induction' n with n ih
+  · simp [Series.partial];field_simp
+  simp; rw [Series.partial_succ _ (by simp)]
+  rw [ih]; simp; rw [if_pos (by omega)]
+  field_simp; ring
 
-theorem Series.absConverges_geom {x: ℝ} (hx: |x| < 1) : (fun n ↦ x ^ n : Series).absConverges := by sorry
+theorem Series.absConverges_geom {x: ℝ} (hx: |x| < 1) : (fun n ↦ x ^ n : Series).absConverges := by
+  apply converges_of_convergesTo
+  have := Series.converges_geom (x:= |x|) (hx := by simpa)
+  convert this using 3 with z; simp
+  by_cases h0 : 0 ≤ z <;> simp [h0]
 
-theorem Series.diverges_geom {x: ℝ} (hx: |x| ≥ 1) : (fun n ↦ x ^ n : Series).diverges := by sorry
+theorem Series.diverges_geom {x: ℝ} (hx: |x| ≥ 1) : (fun n ↦ x ^ n : Series).diverges := by
+  apply Series.diverges_of_nodecay -- x^n diverges. Zero test
+  rw [Metric.tendsto_atTop]; push_neg
+  use 1; simp; intro N;
+  use max 0 N; simp
+  apply le_trans (b := |x^0|); simp
+  rw [abs_pow]; gcongr <;> simp_all
 
-theorem Series.converges_geom_iff (x: ℝ) : (fun n ↦ x ^ n : Series).converges ↔ |x| < 1 := by sorry
+theorem Series.converges_geom_iff (x: ℝ) : (fun n ↦ x ^ n : Series).converges ↔ |x| < 1 := by
+  constructor <;> intro h
+  · contrapose! h; apply diverges_geom; grind
+  exact Series.converges_of_convergesTo (converges_geom h)
 
 /-- Proposition 7.3.4 (Cauchy criterion) -/
 theorem Series.cauchy_criterion {s:Series} (hm: s.m = 1) (hs:s.nonneg) (hmono: ∀ n ≥ 1, s.seq (n+1) ≤ s.seq n) : s.converges ↔ (fun k ↦ 2^k * s.seq (2^k): Series).converges := by
@@ -197,8 +288,27 @@ theorem Series.Basel_problem :  (mk' (m := 1) fun n ↦ 1 / (n:ℝ) ^ 2 : Series
   simp [Complex.ofReal_ofNat, riemannZeta_two] at this
   simpa [←Complex.ofReal_inj]
 
+
+#check Series.partial_le_sum_of_nonneg
 /-- Exercise 7.3.3 -/
-theorem Series.nonneg_sum_zero {a:ℕ → ℝ} (ha: (a:Series).nonneg) (hconv: (a:Series).converges) : (a:Series).sum = 0 ↔ ∀ n, a n = 0 := by sorry
+theorem Series.nonneg_sum_zero {a:ℕ → ℝ} (ha: (a:Series).nonneg) (hconv: (a:Series).converges) : (a:Series).sum = 0 ↔ ∀ n, a n = 0 := by
+  constructor <;> intro h
+  · contrapose! h
+    apply ne_of_gt; choose n hn using h
+    have : a n > 0 := by specialize ha n; simp at ha; grind
+    apply lt_of_lt_of_le ?_ (Series.partial_le_sum_of_nonneg ha hconv n)
+    rcases Nat.eq_zero_or_eq_succ_pred n with (rfl | h)
+    · simp [Series.partial, this]
+    rw [show n = n.pred + 1 by omega]; simp; rw [partial_succ _ (by simp)]
+    simp;
+    rw [if_pos (by omega), show n - 1 + 1 = n by omega];
+    have hp := Series.partial_nonneg ha (n-1)
+    rw [Nat.cast_sub (by omega)]; simp; linarith
+  apply sum_of_converges -- Sum of zeroes
+  convert tendsto_const_nhds (x:=(0:ℝ)) with N
+  simp [Series.partial];
+  apply Finset.sum_eq_zero
+  intro n hn; simp_all
 
 
 end Chapter7
