@@ -478,10 +478,13 @@ lemma Sequence.substitute_base_with_ee' {a a' : Sequence} {b: ℕ → ℚ } {L :
   specialize hM n (by grind); convert hM using 1; simp_all
 
 /-
-If both terms converge, and the base converges to 1, the whole thing converges to 1
+Theorem summary: If the base converges to 1, and exponent converges, then the power converges to 1
+
+Proof details: Use ee positive sequence a' to use power order rules.
+Bound |b| with Z and squeeze a'n^(bn) between fences a'n^(-Z) and a'n^Z.
 -/
 lemma Sequence.tendsTo_one_pow' {B: ℝ} {a: Sequence} {b: ℕ → ℚ} (ha: a.TendsTo 1) (hb: ((fun n ↦ (b n:ℝ)):Sequence).TendsTo B):
-  ((fun (n:ℕ) ↦ (a n:ℝ)^(b n:ℝ)):Sequence).TendsTo (1) := by
+  ((fun (n:ℕ) ↦ (a n:ℝ)^(b n:ℝ)):Sequence).TendsTo (1) := by --
   -- Set up a' for positivity (retrieval)
   have ⟨hee,hplus,h0⟩ := pos_seq_prop ha (by norm_num)
   apply substitute_base_with_ee' (ee_symm.1 hee)
@@ -511,6 +514,12 @@ lemma Sequence.tendsTo_one_pow' {B: ℝ} {a: Sequence} {b: ℕ → ℚ} (ha: a.T
   · left; apply Real.rpow_le_rpow_of_exponent_ge <;> linarith
   right; apply Real.rpow_le_rpow_of_exponent_ge <;> linarith
 
+/-
+Proof details: Instead of trying to directly handle (an)^(bn), we divide by A^(bn) so that
+it converges to 1 instead, which is easier to prove.
+
+We replace a with a positive sequence a' so we can use the desired exponent rule, (x / y) ^ z = x ^ z / y ^ z
+-/
 
 lemma Sequence.tendsTo_ratPow' {A B: ℝ} {a: Sequence} {b : ℕ → ℚ} (hA: A > 0)
 (ha: a.TendsTo A) (hb: ((fun n ↦ (b n:ℝ)):Sequence).TendsTo B):
@@ -520,9 +529,8 @@ lemma Sequence.tendsTo_ratPow' {A B: ℝ} {a: Sequence} {b : ℕ → ℚ} (hA: A
   set a' := pos_seq ha hA
   -- Divide both sides by A^(b n) (processing)
   let v : Sequence := fun (n:ℕ) ↦ (a' n / A)
-  let u : ℕ → ℝ := fun (n:ℕ) ↦ (v n) ^ (b n:ℝ)
   suffices (fun (n:ℕ) ↦ (v n) ^ (b n:ℝ) : Sequence ).TendsTo (1) from ?_
-  · apply substitute_base_with_ee' (ee_symm.1 hee)
+  · apply substitute_base_with_ee' (ee_symm.mp hee)
     apply tendsTo_mul (ratPow_tendsto_rpow hA hb) at this; simp only [mul_one] at this
     convert this; rw [mul_coe]; ext i; simp
     by_cases hi: i ≥ 0 <;> simp [hi]
@@ -538,6 +546,13 @@ lemma Sequence.tendsTo_ratPow' {A B: ℝ} {a: Sequence} {b : ℕ → ℚ} (hA: A
 
 
 #check Real.rpow_seq_tendsTo_rpow
+
+/-
+Proof details: (x^q)^r becomes x^(qn)^rm, so we have two different indices.
+
+We use `Sequence.tendsTo_ratPow'` to instead turn it into (x^qn)^rn. That way, we can directly
+compare it to x^(qr)=x^(qn*rn), element-wise (thus we can use rational exponent rules)
+-/
 
 /-- Proposition 6.7.3(b) / Exercise 6.7.1 -/
 theorem Real.ratPow_ratPow {x:ℝ} (hx: x > 0) (q r:ℝ) : rpow (rpow x q) r = rpow x (q*r) := by
@@ -630,6 +645,13 @@ theorem Real.ratPow_mono_of_gt_one' {x:ℝ} (hx: x > 1) {q r:ℝ} (h : q > r) : 
   rw [← one_ratPow (q-r), ← ratPow_mono]; -- (computing)
   all_goals linarith
 
+/-
+Proof details: Use Real.ratPow_mono_of_gt_one' in one direction.
+
+In the other direction, use contrapose. Split cases on q ≤ r:
+in the < case, use Real.ratPow_mono_of_gt_one' again.
+In the = case, same exponent means same power. = implies ≤. -/
+
 /-- Proposition 6.7.3(e) / Exercise 6.7.1 -/
 theorem Real.ratPow_mono_of_gt_one {x:ℝ} (hx: x > 1) {q r:ℝ} : rpow x q > rpow x r ↔ q > r := by
   choose p hp using eq_lim_of_rat q -- (retrieval)
@@ -644,7 +666,8 @@ theorem Real.ratPow_mono_of_gt_one {x:ℝ} (hx: x > 1) {q r:ℝ} : rpow x q > rp
 #check ratPow_ratPow
 
 /-
-Algebra rearrangement to get ⁻¹ out of the rpow expression.
+Proof details: Turn ⁻¹ into a negative exponent. New goal: flip exponents.
+Combine the two exponents using Real.ratPow_ratPow and swap them, then undo with Real.ratPow_ratPow.
 -/
 theorem Real.inv_ratPow {x:ℝ} (hx: x > 0) {q:ℝ} : rpow (x⁻¹) q = (rpow x q)⁻¹ := by
   rw [← zpow_neg_one x]
