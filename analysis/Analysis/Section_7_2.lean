@@ -32,13 +32,27 @@ structure Series where
   seq : ℤ → ℝ
   vanish : ∀ n < m, seq n = 0
 
-/-- Functions from ℕ to ℝ can be thought of as series. -/
+/-- Modifying Tao's API to make it easier to read.
+Created by GPT-6 Astra by OpenAI. -/
+@[coe] def Series.ofNat (a : ℕ → ℝ) : Series where
+  m := 0
+  seq n := if n ≥ 0 then a n.toNat else 0
+  vanish := by grind -- Negative indices cannot satisfy n ≥ 0.
+
+/-- Coercion through the named embedding.
+Created by GPT-6 Astra by OpenAI. -/
 instance Series.instCoe : Coe (ℕ → ℝ) Series where
-  coe := fun a ↦ {
-    m := 0
-    seq n := if n ≥ 0 then a n.toNat else 0
-    vanish := by grind
-  }
+  coe := Series.ofNat
+
+/-- The embedding starts at zero. Created by GPT-6 Astra by OpenAI. -/
+@[simp] theorem Series.ofNat_m (a : ℕ → ℝ) :
+    (Series.ofNat a).m = 0 := by
+  rfl
+
+/-- Evaluate the zero extension. Created by GPT-6 Astra by OpenAI. -/
+@[simp] theorem Series.ofNat_seq (a : ℕ → ℝ) (n : ℤ) :
+    (Series.ofNat a).seq n = if n ≥ 0 then a n.toNat else 0 := by
+  rfl
 
 @[simp]
 theorem Series.eval_coe (a: ℕ → ℝ) (n: ℕ) : (a: Series).seq n = a n := by simp
@@ -643,7 +657,6 @@ theorem Series.shift {s:Series} {x:ℝ} (h: s.convergesTo x) (k:ℤ) :
 
 lemma Series.telescope' {a:ℕ → ℝ} (ha: Filter.atTop.Tendsto a (nhds 0)) (N:ℕ) :
   ((fun n:ℕ ↦ a n - a (n+1)):Series).partial N = a 0 - a (N+1) := by
-  simp
   induction' N with N ih
   · simp [Series.partial]
   push_cast

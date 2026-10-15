@@ -36,76 +36,171 @@ abbrev AbsConvergent {X:Type} (f: X → ℝ) : Prop := ∃ g: ℕ → X, Bijecti
 
 theorem AbsConvergent.mk {X: Type} {f:X → ℝ} {g:ℕ → X} (h: Bijective g) (hfg: (f ∘ g:Series).absConverges) : AbsConvergent f := by use g
 
+
 open Classical in
 /-- The definition has been chosen to give a sensible value when `X` is finite, even though
 `AbsConvergent` is by definition false in this context. -/
 noncomputable abbrev Sum {X:Type} (f: X → ℝ) : ℝ := if h: AbsConvergent f then (f ∘ h.choose:Series).sum else
   if _hX: Finite X then (∑ x ∈ @univ X (Fintype.ofFinite X), f x) else 0
 
+/-
+  API for finite branch of `Sum`
+-/
 theorem Sum.of_finite {X:Type} [hX:Finite X] (f:X → ℝ) : Sum f = ∑ x ∈ @Finset.univ X (Fintype.ofFinite X), f x := by
   have : ¬ AbsConvergent f := by
     by_contra!; choose g hg _ using this
     rw [←hg.finite_iff, ←not_infinite_iff_finite] at hX; apply hX; infer_instance
   simp [Sum, this, hX]
 
+/-
+  If f absConverges using some bijection, then if we use another bijection, it will still absConverge.
+-/
+/-- Coercion compatibility repairs. Created by GPT-6 Astra by OpenAI. -/
 theorem AbsConvergent.comp {X: Type} {f:X → ℝ} {g:ℕ → X} (h: Bijective g) (hf: AbsConvergent f) : (f ∘ g:Series).absConverges := by
   choose g' hbij hconv using hf
   choose g'_inv hleft hright using bijective_iff_has_inverse.mp hbij
   have hG : Bijective (g'_inv ∘ g) := .comp ⟨hright.injective, hleft.surjective⟩ h
-  convert (absConverges_of_permute hconv hG).1 using 4 with n
-  simp [hright (g n.toNat)]
+  -- This works because g and g' are two ways to enumerate the elements of X: they map the same elems.
+  -- We can prove f ∘ g absConverges by permuting the absConverging series of f ∘ g' into the order given by g.
+  convert (absConverges_of_permute hconv hG).1 using 1 -- Keep the reindexed series intact during conversion.
+  congr 1; funext n -- Compare the natural-indexed enumeration functions.
+  simp [Function.comp_def, hright (g n)] -- Cancel the chosen enumeration with its right inverse.
 
+/-
+  The series indexed by ℕ (f ∘ g) converges to sum we get from indexing by X (f).
+-/
+/-- Coercion compatibility repairs. Created by GPT-6 Astra by OpenAI. -/
 theorem Sum.eq {X: Type} {f:X → ℝ} {g:ℕ → X} (h: Bijective g) (hfg: (f ∘ g:Series).absConverges) : (f ∘ g:Series).convergesTo (Sum f) := by
-  have : AbsConvergent f := .mk h hfg
+  have : AbsConvergent f := .mk h hfg -- We're in the AbsConvergent branch of `Sum`
   simp [Sum, this]
+  -- Unfortunately, even though we directly used `g` in the existence proof for `Sum f`,
+  -- `Sum f` doesn't actually directly use `g`, only the existence proof.
+  -- Without direct access to `g`, it uses `.choose` to pick its own bijection `g'` to enumerate `X`.
+
+  -- Lean only knows that `Sum f` is equal to `sum (f ∘ g')`.
+  -- Thus, our goal is now to prove that `f ∘ g` converges to `sum (f ∘ g')`
   choose hbij hconv using this.choose_spec
   set g' := this.choose
   choose g'_inv hleft hright using bijective_iff_has_inverse.mp hbij
+  -- We know `(f ∘ g)` converges to `sum (f ∘ g)`.
+  -- So, we need to prove that the sum is the same regardless of which bijection we use.
   convert convergesTo_sum (converges_of_absConverges hfg) using 1
+  -- How do we know this? Because `g` and `g'` at worst, might enumerate `X` differently
   have hG : Bijective (g'_inv ∘ g) := .comp ⟨hright.injective, hleft.surjective⟩ h
-  convert (absConverges_of_permute hconv hG).2 using 4 with _ n
-  by_cases hn : n ≥ 0 <;> simp [hn, hright (g n.toNat)]
+  -- So, we just have to re-shuffle the indices to convert from `g` to `g'`.
+  convert (absConverges_of_permute hconv hG).2 using 4 with n -- Compare the natural-indexed enumeration functions.
+  simp [hright (g n)] -- Cancel the chosen enumeration with its right inverse.
 
-theorem Sum.of_comp {X Y:Type} {f:X → ℝ} (h: AbsConvergent f) {g: Y → X} (hbij: Bijective g) : AbsConvergent (f ∘ g) ∧ Sum f = Sum (f ∘ g) := by
+/-
+  From Shaunticlair: a slightly more conveniently packaged version.
+-/
+theorem AbsConvergent_Sum {X: Type} {f:X → ℝ} (h : AbsConvergent f) : ∃ g:ℕ → X, Bijective g ∧ (f ∘ g: Series).absConverges ∧ Sum f = (f ∘ g:Series).sum := by
+  choose g hg1 hg2 using h; use g, hg1, hg2
+  have := Sum.eq hg1 hg2
+  symm; apply (sum_of_converges this)
+/-
+  1. The infinite sum remains absConvergent after re-indexing from X to Y via a bijection.
+  2. The infinite sum is the same whether we change its indexing from X (f) to Y (f ∘ g).
+-/
+theorem Sum.of_comp {X Y:Type} {f:X → ℝ} (h: AbsConvergent f) {g: Y → X} (hbij: Bijective g) :
+AbsConvergent (f ∘ g) ∧ Sum f = Sum (f ∘ g) := by
+  -- Grab the nat-indexing for X: g'
   choose g' hbij' hconv' using h
-  choose g_inv hleft hright using bijective_iff_has_inverse.mp hbij
+  choose g_inv hleft hright using bijective_iff_has_inverse.mp hbij -- g_inv : X → Y
+  -- `f` uses `g'` to absConverge. We'll have `(f ∘ g)` use `g_inv ∘ g'` to absConverge.
+  -- Not only is `g_inv ∘ g` a bijection, but we'll have exactly the same indexing in ℕ for both.
   have hbij_g_inv_g' : Bijective (g_inv ∘ g') := .comp ⟨hright.injective, hleft.surjective⟩ hbij'
   have hident : (f ∘ g) ∘ g_inv ∘ g' = f ∘ g' := by ext n; simp [hright (g' n)]
+  -- Thus, the absConverges proof for one can be used for the other
   refine ⟨ ⟨ g_inv ∘ g', ⟨ hbij_g_inv_g', by convert hconv' ⟩ ⟩, ?_ ⟩
+  -- Since they're the same function, their sums must be equal.
   have h := eq (f := f ∘ g) hbij_g_inv_g' (by convert hconv')
   rw [hident] at h
   solve_by_elim [convergesTo_uniq, eq]
 
+-- Utility: converting Icc in ℤ to Icc in ℕ
 @[simp]
 theorem Finset.Icc_eq_cast (N:ℕ) : Icc 0 (N:ℤ) = map Nat.castEmbedding (.Icc 0 N) := by
   ext n; simp; constructor
   . intro ⟨ hn, _ ⟩; lift n to ℕ using hn; use n; simp_all
   rintro ⟨ _, ⟨ _, rfl ⟩ ⟩; simp_all
 
+-- Empty interval
 theorem Finset.Icc_empty {N:ℤ} (h: ¬ N ≥ 0) : Icc 0 N = ∅ := by
   ext; simp; intros; contrapose! h; linarith
 
-/-- Theorem 8.2.2, preliminary version.  The arguments here are rearranged slightly from the text. -/
+#check Finset.sum_le_sum_of_subset_of_nonneg -- Used in 7.4, derivable using `finite_series_of_disjoint_union` from 7.1
+#check Series.partial_le_sum_of_nonneg
+
+--lemma absconv_sum {X: Type} {f: X → ℝ} (hf: AbsConvergent f) :
+
+
+lemma sum_of_finite_subset (X : Type) (Y : Finset X)
+(f : X → ℝ) (hf : AbsConvergent f) (hpos : ∀ x, 0 ≤ f x):
+  ∑ x ∈ Y, f x ≤ Sum f := by
+  choose g hg_bij hg2 hg3 using AbsConvergent_Sum hf
+  rw [hg3]
+  choose g_inv hleft hright using bijective_iff_has_inverse.mp hg_bij
+  -- Use g_inv to re-index Y using ℕ
+  set A := Y.image g_inv -- Using .image instead of '' apparently allows us to use Finset operations like .sup
+  -- Use the fact that g_inv '' Y is finite to get a max
+  set N := A.sup id
+  calc
+    _ = ∑ n ∈ A, f (g n) := by -- Re-indexing as per 7.1.11(c), since we have a finite set
+      unfold A; rw [sum_image (by exact Set.LeftInvOn.injOn fun x a ↦ hright x)]
+      apply sum_congr rfl; intro x hx; rw [(hright x)]
+    _ ≤ ∑ n ∈ Finset.Icc 0 N, f (g n) := by -- Upper-bounded by larger set going up to max
+      dsimp [N]; apply Finset.sum_le_sum_of_subset_of_nonneg
+      · intro n hn; simp; apply Finset.le_sup (f:= id) hn -- By construction, each term ≤ sup
+      simp [hpos] -- All terms are positive, so these in particular are, too
+    _ ≤ (f ∘ g : Series).sum := by -- Partial sum ≤ total sum
+      convert Series.partial_le_sum_of_nonneg ?_ ?_ N
+      simp [Series.partial]
+      · intro n; simp; split_ifs with h <;> simp [hpos]
+      apply Series.converges_of_absConverges hg2
+
+#check le_of_tendsto'
+#check tendsto_natCast_atTop_atTop
+#check Tendsto.eventually_const_le
+#check Prod.fst
+#check Finset.sup
+
+/-- Theorem 8.2.2, preliminary version.
+Our goal is to show that the double-sum converges to the same value as the single sum
+over ℕ × ℕ.-/
 theorem sum_of_sum_of_AbsConvergent_nonneg {f:ℕ × ℕ → ℝ} (hf:AbsConvergent f) (hpos: ∀ n m, 0 ≤ f (n, m)) :
   (∀ n, ((fun m ↦ f (n, m)):Series).converges) ∧
   (fun n ↦ ((fun m ↦ f (n, m)):Series).sum:Series).convergesTo (Sum f) := by
+  /-
+    `L` = ∑_{ℕ × ℕ} ⋯
+  -/
   set L := Sum f
-  set a : ℕ → Series := fun n ↦ ((fun m ↦ f (n, m)):Series)
   have hLpos : 0 ≤ L := by
     simp [L, Sum, hf]; apply sum_of_nonneg; intro n; by_cases h: n ≥ 0 <;> simp [h]; grind
-  have hfinsum (X: Finset (ℕ × ℕ)) : ∑ p ∈ X, f p ≤ L := by sorry
+  have hfinsum (X: Finset (ℕ × ℕ)) : ∑ p ∈ X, f p ≤ L :=  sum_of_finite_subset _ _ _ hf (fun ⟨x1, x2⟩ ↦ hpos x1 x2)
+  /-
+    *First half of equality goal*: ∑ ∑ ≤ L.
+
+    `a n` is the inner sum of ∑ ∑:
+        ∑ n, (`∑ m ⋯`) = ∑ n, `a n`.
+    We start by showing that the inner sum converges (well-defined limit).
+  -/
+  set a : ℕ → Series := fun n ↦ ((fun m ↦ f (n, m)):Series)
   have hfinsum' (n M:ℕ) : (a n).partial M ≤ L := by
     simp [a, Series.partial, Finset.Icc_eq_cast]
     convert_to ∑ x ∈ .map (Embedding.sectR n ℕ) (.Icc 0 M), f x ≤ L
-    . simp
+    . simp -- a n ≤ L because it's a subseries of the L-series.
     solve_by_elim
   have hnon (n:ℕ) : (a n).nonneg := by
     simp [a, nonneg]; intro m; split_ifs <;> simp [hpos]
-  have hconv (n:ℕ) : (a n).converges := by
+  have hconv (n:ℕ) : (a n).converges := by -- Bounded+nonneg → converge
     rw [converges_of_nonneg_iff (hnon n)]
     use L; intro N; by_cases h: N ≥ 0
     . lift N to ℕ using h; solve_by_elim
     rw [partial_of_lt (by simp [a]; linarith)]; simp [hLpos]
+  /-
+    Start with the double finite sum, representing the inner sum as `a n`.
+  -/
   have (N M:ℤ) : ∑ n ∈ Icc 0 N, (a n.toNat).partial M ≤ L := by
     by_cases hN : N ≥ 0; swap
     . simp [Finset.Icc_empty hN, hLpos]
@@ -118,27 +213,53 @@ theorem sum_of_sum_of_AbsConvergent_nonneg {f:ℕ × ℕ → ℝ} (hf:AbsConverg
     convert_to ∑ x ∈ (Icc 0 N) ×ˢ (.Icc 0 M), f x ≤ L
     . simp [a, sum_product, Series.partial]
     solve_by_elim
+  /-
+    Send the inner limit `a n` to infinity first:
+  -/
   replace (N:ℤ) : ∑ n ∈ Icc 0 N, (a n.toNat).sum ≤ L := by
     apply le_of_tendsto' (x := .atTop) (tendsto_finset_sum _ _) (this N)
     solve_by_elim [convergesTo_sum]
   replace (N:ℤ) : (fun n ↦ (a n).sum:Series).partial N ≤ L := by
     convert this N with n hn; simp_all
+
   have hnon' : (fun n ↦ (a n).sum:Series).nonneg := by
     intro n; simp; split_ifs
     . exact sum_of_nonneg (hnon n.toNat)
     simp
+  /-
+    Send outer limit to infinity: still ≤ L.
+  -/
   have hconv' : (fun n ↦ (a n).sum:Series).converges := by
     rw [converges_of_nonneg_iff hnon']; use L
   replace : (fun n ↦ (a n).sum:Series).sum ≤ L := le_of_tendsto' (convergesTo_sum hconv') this
+  /-
+    *Second half of equality goal*: ∑ ∑ ≥ L.
+
+    ≥ L is more easily proven by ≥ L - ε.
+  -/
   replace : (fun n ↦ (a n).sum:Series).sum = L := by
     apply le_antisymm this (le_of_forall_sub_le _); intro ε hε
+    -- Since L is sup, we can get our sum arbitrarily close: ≥ L - ε.
     replace : ∃ X, ∑ p ∈ X, f p ≥ L - ε := by
-      sorry
+      -- Switch from (ℕ × ℕ) to ℕ indexing
+      choose g hg1 hg2 hg3 using AbsConvergent_Sum hf
+      -- Since L is lim, we can find some n that gives ∑.partial n ≥ L - ε.
+      have hconv := (Sum.eq hg1 hg2).comp tendsto_natCast_atTop_atTop -- Sum f is the limit; also use ℕ instead of ℤ
+      have := hconv.eventually_const_le ( u:= L - ε ) (by linarith)
+      choose n hn using this.exists; rw [← ge_iff_le] at hn
+      -- We convert this back into ℕ × ℕ-land to get X.
+      use (Icc 0 n).image g -- = X
+      -- Which has our desired property.
+      convert hn; dsimp [Series.partial]
+      rw [Finset.sum_image hg1.injective.injOn]
+      simp
     choose X hX using this
+    -- To convert to a double sum for ∑ ∑, we need a supset [0, N] × [0, M]
     have : ∃ N, ∃ M, X ⊆ (Icc 0 N) ×ˢ (Icc 0 M) := by
-      sorry
+      use X.sup Prod.fst, X.sup Prod.snd -- Use sup for 1st and 2nd elem respectively
+      intro x hx; simp [le_sup hx]
     choose N M hX' using this
-    calc
+    calc -- Use these subsets for their corresponding sums.
       _ ≤ ∑ p ∈ X, f p := hX
       _ ≤ ∑ p ∈ (Icc 0 N) ×ˢ (Icc 0 M), f p := sum_le_sum_of_subset_of_nonneg hX' (by solve_by_elim)
       _ = ∑ n ∈ Icc 0 N, ∑ m ∈ Icc 0 M, f (n, m) := sum_product _ _ _
@@ -148,9 +269,14 @@ theorem sum_of_sum_of_AbsConvergent_nonneg {f:ℕ × ℕ → ℝ} (hf:AbsConverg
         simp [a, Series.partial]
       _ = (fun n ↦ (a n).sum:Series).partial N := by simp [Series.partial]
       _ ≤ _ := partial_le_sum_of_nonneg hnon' hconv' _
+  /-
+    Equal limit means one converges to the other.
+  -/
   simp [a, hconv, ← this, Series.convergesTo_sum hconv']
 
-/-- Theorem 8.2.2, second version -/
+/-- Theorem 8.2.2, second version
+Coercion compatibility repairs. Created by GPT-6 Astra by OpenAI.
+-/
 theorem sum_of_sum_of_AbsConvergent {f:ℕ × ℕ → ℝ} (hf:AbsConvergent f) :
   (∀ n, ((fun m ↦ f (n, m)):Series).absConverges) ∧
   (fun n ↦ ((fun m ↦ f (n, m)):Series).sum:Series).convergesTo (Sum f) := by
@@ -158,9 +284,16 @@ theorem sum_of_sum_of_AbsConvergent {f:ℕ × ℕ → ℝ} (hf:AbsConvergent f) 
   set fminus := max (-f) 0
   have hfplus_nonneg : ∀ n m, 0 ≤ fplus (n, m) := by intro n m; simp [fplus]
   have hfminus_nonneg : ∀ n m, 0 ≤ fminus (n, m) := by intro n m; simp [fminus]
-  have hdiff : f = fplus - fminus := by sorry
-  have hfplus_conv : AbsConvergent fplus := by sorry
-  have hfminus_conv : AbsConvergent fminus := by sorry
+  have hdiff : f = fplus - fminus := by ext i; field_simp [fplus, fminus]
+  have hfplus_conv : AbsConvergent fplus := by
+    choose g hg1 hg2 using hf
+    use g, hg1
+    -- ∑ |(f ∘ g) n| = ∑ (f) converges → ∑ (f) BddAbove by L →  ∑ (fplus) BddAbove by L, thus converges
+    sorry
+  have hfminus_conv : AbsConvergent fminus := by
+    choose g hg1 hg2 using hf
+    -- Same as above
+    sorry
   choose hfplus_conv' hfplus_sum using sum_of_sum_of_AbsConvergent_nonneg hfplus_conv hfplus_nonneg
   choose hfminus_conv' hfminus_sum using sum_of_sum_of_AbsConvergent_nonneg hfminus_conv hfminus_nonneg
   split_ands
@@ -172,21 +305,17 @@ theorem sum_of_sum_of_AbsConvergent {f:ℕ × ℕ → ℝ} (hf:AbsConvergent f) 
     change (fun n ↦ ((fun m ↦ (fplus - fminus) (n, m)):Series).sum:Series) =
       (fun n ↦ ((fun m ↦ fplus (n, m)):Series).sum:Series)
       - (fun n ↦ ((fun m ↦ (fminus) (n, m)):Series).sum:Series)
-    convert_to (fun n ↦ ((fun m ↦ (fplus - fminus) (n, m)):Series).sum:Series) =
-      (((fun n ↦ ((fun m ↦ fplus (n, m)):Series).sum) - (fun n ↦ ((fun m ↦ (fminus) (n, m)):Series).sum):ℕ → ℝ):Series)
-    . convert sub_coe _ _
-    rcongr _ n; simp
-    convert (sub _ _).2 with m; rfl
-    split_ifs with h <;> simp [h, HSub.hSub, Sub.sub]
-    . solve_by_elim
-    convert hfminus_conv' n.toNat
+    rw [sub_coe] -- Rewrite subtraction of outer series as pointwise subtraction.
+    congr 1; funext n -- Compare the nth row sums.
+    simpa only [Pi.sub_apply, sub_coe] using
+      (Series.sub (hfplus_conv' n) (hfminus_conv' n)).2 -- Apply the sum subtraction law to the convergent rows.
   have ⟨ g, hg, _ ⟩ := hf
   have h1 := Sum.eq hg (hf.comp hg)
   have hplus := Sum.eq hg (hfplus_conv.comp hg)
   have hminus := Sum.eq hg (hfminus_conv.comp hg)
   apply convergesTo_uniq h1 _
-  convert (convergesTo.sub hplus hminus) using 3 with n
-  split_ifs with h <;> simp [h, hdiff, HSub.hSub, Sub.sub]
+  convert (convergesTo.sub hplus hminus) using 1 -- Compare the enumerated series after subtracting their limits.
+  simp [sub_coe, hdiff, Function.comp_def] -- Both sides enumerate fplus − fminus along g.
 
 /-- Theorem 8.2.2, third version -/
 theorem sum_of_sum_of_AbsConvergent' {f:ℕ × ℕ → ℝ} (hf:AbsConvergent f) :
@@ -217,7 +346,9 @@ theorem AbsConvergent'.of_finite {X:Type} [Finite X] (f:X → ℝ) : AbsConverge
   have _ := Fintype.ofFinite X
   simp [bddAbove_def]; use ∑ x, |f x|; intro A; apply Finset.sum_le_univ_sum_of_nonneg; simp
 
-/-- Not in textbook, but should have been included. -/
+/-- Not in textbook, but should have been included.
+Coercion compatibility repairs. Created by GPT-6 Astra by OpenAI.
+-/
 theorem AbsConvergent'.of_countable {X:Type} (hX:CountablyInfinite X) {f:X → ℝ} :
   AbsConvergent' f ↔ AbsConvergent f := by
   constructor
@@ -230,7 +361,7 @@ theorem AbsConvergent'.of_countable {X:Type} (hX:CountablyInfinite X) {f:X → �
         convert hL (map g' (Icc 0 N))
         simp [Series.partial]; rfl
       convert hL ∅
-      simp; apply partial_of_lt; grind
+      simp; apply partial_of_lt; simpa using hN -- The start index is zero, so this negative cutoff is before the start.
     simp [nonneg]
     intro n; by_cases h: n ≥ 0 <;> simp [h]
   intro hf; rwa [AbsConvergent.iff hX f] at hf

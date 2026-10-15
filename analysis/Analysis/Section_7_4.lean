@@ -23,7 +23,8 @@ theorem Series.sum_eq_sum (b:ℕ → ℝ) {N:ℤ} (hN: N ≥ 0) :
 
 
 /-- Proposition 7.4.1.
-Annotations added by GPT-6 Astra by OpenAI; original proof preserved.
+Annotations added by GPT-6 Astra by OpenAI; original annotations retained.
+Coercion compatibility repairs. Created by GPT-6 Astra by OpenAI.
 -/
 theorem Series.converges_of_permute_nonneg
     {a : ℕ → ℝ} (ha : (a : Series).nonneg) (hconv : (a : Series).converges) -- Assume nonnegative terms and convergence.
@@ -38,7 +39,7 @@ theorem Series.converges_of_permute_nonneg
   set af : ℕ → ℝ := fun n ↦ a (f n)
   have haf : (af : Series).nonneg := by
     intro n; by_cases h : n ≥ 0 <;> simp [h, af]
-    specialize ha (f n.toNat); grind
+    simpa using ha (f n.toNat) -- Evaluate nonnegativity at the corresponding natural index.
 
   /- The partial sums are increasing because all terms are nonnegative.
      Let L and L' be their suprema. Convergence of the original series
@@ -158,11 +159,12 @@ theorem Series.converges_of_permute_nonneg
 theorem Series.zeta_2_converges : (fun n:ℕ ↦ 1/(n+1:ℝ)^2 : Series).converges := by
   obtain ⟨L, hL⟩ := (Series.converges_qseries 2 (by simp)).mpr (by simp) -- Not identical, but close
   use L; convert (Series.shift hL (-1)) with z -- Index needs to be shifted
-  simp; split_ifs with hn <;> simp
+  simp [Series.ofNat]; funext z; split_ifs with hn <;> simp
   congr; rw [← Int.cast_natCast]; simp [hn]
 
 #check Function.Involutive.bijective -- Suggested by astra (could do it other ways but tedious)
 
+/-- Coercion compatibility repairs. Created by GPT-6 Astra by OpenAI. -/
 theorem Series.permuted_zeta_2_converges :
   (fun n:ℕ ↦ if Even n then 1/(n+2:ℝ)^2 else 1/(n:ℝ)^2 : Series).converges := by
     have hq := (Series.converges_qseries 2 (by simp)).mpr (by simp)
@@ -174,10 +176,11 @@ theorem Series.permuted_zeta_2_converges :
       by_cases h : Even n <;> simp [h]
       simp at h; choose m hm using h; grind
     convert this.1 using 3 with z;
-    split_ifs with h0 <;> simp
+    -- convert already gives a natural index; only its parity needs splitting.
     split_ifs with h1 <;> simp [f, h1] <;> field_simp
     ring; rw [Nat.cast_sub]; simp; simp [Odd] at h1; omega
 
+/-- Coercion compatibility repairs. Created by GPT-6 Astra by OpenAI. -/
 theorem Series.permuted_zeta_2_eq_zeta_2 :
   (fun n:ℕ ↦ if Even n then 1/(n+2:ℝ)^2 else 1/(n:ℝ)^2 : Series).sum = (fun n:ℕ ↦ 1/(n+1:ℝ)^2 : Series).sum := by
     have hq := (Series.converges_qseries 2 (by simp)).mpr (by simp)
@@ -189,12 +192,18 @@ theorem Series.permuted_zeta_2_eq_zeta_2 :
       by_cases h : Even n <;> simp [h]
       simp at h; choose m hm using h; grind
     convert this.2.symm using 4 with z -- Basically the same just grab the other half
-    split_ifs with h0 <;> simp
+    -- convert already gives a natural index; only its parity needs splitting.
     split_ifs with h1 <;> simp [f, h1] <;> field_simp
     ring; rw [Nat.cast_sub]; simp; simp [Odd] at h1; omega
 
+lemma Series.abs_coe_series (a : ℕ → ℝ) :
+  (a : Series).abs = (fun n ↦ |a n| : Series) := by
+  ext n; rfl -- Match the starting indices and compare the terms.
+  by_cases hn : n ≥ 0 <;> simp [hn] -- Both series vanish at negative indices.
+
 /-- Proposition 7.4.3 (Rearrangement of series).
-Annotations added by GPT-6 Astra by OpenAI; original proof preserved.
+Annotations added by GPT-6 Astra by OpenAI; original annotations retained.
+Coercion compatibility repairs. Created by GPT-6 Astra by OpenAI.
 -/
 theorem Series.absConverges_of_permute {a:ℕ → ℝ} (ha : (a:Series).absConverges)
   {f: ℕ → ℕ} (hf: Function.Bijective f) :
@@ -205,17 +214,17 @@ theorem Series.absConverges_of_permute {a:ℕ → ℝ} (ha : (a:Series).absConve
   unfold absConverges at ha
   /- Since |a n| is nonnegative, we can use 7.4.1 (permutation of nonnegative series) -/
   have habs : (fun n ↦ |a (f n)| : Series).converges ∧ L = (fun n ↦ |a (f n)| : Series).sum := by
-    convert converges_of_permute_nonneg (a := fun n ↦ |a n|) _ _ hf using 3
-    . simp; ext n; by_cases n ≥ 0 <;> grind
-    . intro n; by_cases h: n ≥ 0 <;> simp [h]
-    convert ha with n; by_cases n ≥ 0 <;> grind
+    simpa [L, abs_coe_series] using
+      (converges_of_permute_nonneg (a := fun n ↦ |a n|)
+        (by intro n; by_cases h : n ≥ 0 <;> simp [h])
+        (by simpa [abs_coe_series] using ha) hf) -- Apply nonnegative rearrangement to the pointwise absolute values.
 
   /- Now, we need to handle the sum=sum goal: first, turn into into convergence-/
   set L' := (a:Series).sum
   set af : ℕ → ℝ := fun n ↦ a (f n)
   suffices : (af:Series).convergesTo L' -- One converges to the other
   . simp [sum_of_converges this, absConverges]
-    convert habs.1 with n; by_cases n ≥ 0 <;> grind
+    simpa [abs_coe_series, af] using habs.1 -- Identify the rearranged absolute-value series.
   simp [convergesTo, LinearOrderedAddCommGroup.tendsto_nhds] -- Convert tendsTo into tractable form
   intro ε hε
 
@@ -348,6 +357,7 @@ noncomputable abbrev Series.a_7_4_4 : ℕ → ℝ := fun n ↦ (-1:ℝ)^n / (n+2
 #check Filter.tendsto_comp_val_Ici_atTop
 #check tendsto_inv_atTop_zero
 
+/-- Coercion compatibility repairs. Created by GPT-6 Astra by OpenAI. -/
 theorem Series.ex_7_4_4_conv : (a_7_4_4 : Series).converges := by
   unfold Series.a_7_4_4;
   have := Series.converges_of_alternating (m:= 0) -- Invoke alternating properly
@@ -359,8 +369,9 @@ theorem Series.ex_7_4_4_conv : (a_7_4_4 : Series).converges := by
         rw [← Nat.map_cast_int_atTop, Filter.tendsto_map'_iff] -- Turn into nat, so we can use 1/n lemma
         have := (Filter.tendsto_add_atTop_iff_nat 2).mpr tendsto_one_div_atTop_nhds_zero_nat -- Shift 1/n lemma by +2
         simpa)
-  convert this with z;
-  split_ifs with hz <;> simp
+  convert this -- Compare the coerced sequence with the alternating-series construction.
+  simp [Series.ofNat]; funext z -- Expose the sequence functions and introduce their integer index.
+  split_ifs with hz <;> try simp -- The negative case vanishes; the positive case may already be simplified.
   lift z to ℕ using hz; field_simp
 
 
@@ -374,6 +385,7 @@ theorem Series.ex_7_4_4_conv : (a_7_4_4 : Series).converges := by
 
 #check Finset.sum_insert
 
+/-- Coercion compatibility repairs. Created by GPT-6 Astra by OpenAI. -/
 theorem Series.ex_7_4_4_sum : (a_7_4_4 : Series).sum > 0 := by
   apply lt_of_lt_of_le (b:= 1/6) (by simp) -- 1/2 - 1/3 = 1/6 is as low as we go: any longer series add a positive amount
   have h := Series.ex_7_4_4_conv
@@ -383,7 +395,7 @@ theorem Series.ex_7_4_4_sum : (a_7_4_4 : Series).sum > 0 := by
   lift N to ℕ using (by omega) -- We're gonna do induction
   -- First two terms add to 1/6, and the remainder are nonnegative.
   suffices ht : 0 ≤ ∑ k ∈ Finset.Ico 2 (N + 1), a_7_4_4 k by
-    simp only [Series.partial]
+    simp only [Series.partial, Series.ofNat_m, Series.ofNat_seq] -- Expose the start index and terms before reindexing.
     rw [Series.sum_eq_sum _ (by simp)]; simp only [Int.toNat_natCast] -- Switch to nat
     rw [show Finset.Iic N = Finset.Ico 0 (N + 1) by bound]
     rw [← Finset.sum_Ico_consecutive (n:=2) _ (by simp) (by omega)] -- Split
@@ -482,11 +494,6 @@ This next theorem would benefit from being able to convert abs sequences
 at the direct level of sequences, based on 7.4.1's result being in terms of
 ℕ → ℝ sequences, rather than series.
 -/
-lemma Series.abs_coe_series (a : ℕ → ℝ) :
-  (a : Series).abs = (fun n ↦ |a n| : Series) := by
-  ext n; rfl -- Match the starting indices and compare the terms.
-  by_cases hn : n ≥ 0 <;> simp [hn] -- Both series vanish at negative indices.
-
 set_option pp.coercions.types true in
 /-- Exercise 7.4.2 : reprove Proposition 7.4.3 using Proposition 7.41, Proposition 7.2.14,
     and expressing `a n` as the difference of `a n + |a n|` and `|a n|`. -/

@@ -336,6 +336,7 @@ theorem map_finite_series {X Y:Type*} [Fintype X] [Fintype Y] (f: X → ℝ) {g:
     ∑ x, f x = ∑ y, f (g y) := by
   show ∑ x ∈ (Finset.univ : Finset X), f x = ∑ y ∈ (Finset.univ : Finset Y), f (g y) -- For my understanding
   let n:= Finset.card (Finset.univ : Finset Y)
+  -- Both X and Y have same cardinality
   have hcard : Finset.card (Finset.univ : Finset X) = n := (Fintype.card_of_bijective hg).symm
   choose s hs using exist_bijection (n:=n) (Finset.univ : Finset Y) rfl
   rw [finite_series_eq (Finset.univ : Finset Y) (n:=n) (g:=s) (hg:=hs)]

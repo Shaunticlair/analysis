@@ -143,7 +143,7 @@ theorem Series.converges_geom {x: ℝ} (hx: |x| < 1) : (fun n ↦ x ^ n : Series
     apply Filter.Tendsto.const_sub (1 : ℝ) -- Of 1-a form, converge with a
     have h1 := tendsto_pow_atTop_nhds_zero_of_abs_lt_one hx -- Lean thm for x^n --> 0
     rwa [← Filter.tendsto_add_atTop_iff_nat 1] at h1 -- We want x^(n+1) rather than x^n
-  ext n; simp
+  ext n
   induction' n with n ih
   · simp [Series.partial];field_simp
   simp; rw [Series.partial_succ _ (by simp)]
@@ -153,7 +153,7 @@ theorem Series.converges_geom {x: ℝ} (hx: |x| < 1) : (fun n ↦ x ^ n : Series
 theorem Series.absConverges_geom {x: ℝ} (hx: |x| < 1) : (fun n ↦ x ^ n : Series).absConverges := by
   apply converges_of_convergesTo
   have := Series.converges_geom (x:= |x|) (hx := by simpa)
-  convert this using 3 with z; simp
+  convert this using 3; simp [Series.ofNat]; funext z
   by_cases h0 : 0 ≤ z <;> simp [h0]
 
 theorem Series.diverges_geom {x: ℝ} (hx: |x| ≥ 1) : (fun n ↦ x ^ n : Series).diverges := by
